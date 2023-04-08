@@ -1,0 +1,52 @@
+{
+  "name": "Actionflow Composer",
+  "description": "Create Automation Workflow",
+  "version": "1.0",
+  "manifest_version": 3,
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "background",
+    "scripting",
+    "webNavigation",
+    "tabs",
+    "unlimitedStorage",
+    "contentSettings",
+    "webNavigation",
+    "cookies",
+    "downloads"
+  ],
+  "action": {
+    "default_icon": {
+      "48": "/icons/48.png",
+      "128": "/icons/128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*/*"
+      ],
+      "js": [
+        "./contentscripts/firstContent.js"
+      ]
+    }
+  ],
+  "host_permissions": [
+    "https://*/*"
+  ],
+  "icons": {
+    "48": "/icons/48.png",
+    "128": "/icons/128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [ "contentscripts/ActionsRecorder.js" ],
+      "matches": [ "https://*/*" ]
+    }
+  ],
+  "options_page": "popup.html"
+}
