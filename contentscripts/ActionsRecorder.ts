@@ -1,83 +1,19 @@
+import { isExpressionWithTypeArguments } from "../node_modules/typescript/lib/typescript";
 import {
-  RuntimeRequest,
-  ActionEventTypes,
+  ChromeExtensionMessage,
+  ContentScriptMessage,
   ActionClickProp,
   ActionCommonProp,
+  Action,
 } from "./ActionsRecorderTypes";
 
 let PAGE_URL = window.location.href || "";
 
-console.log(
-  "///////////////////////////// actions recorder.js ////////////////////////"
-);
-
-chrome.runtime.onMessage.addListener(
-  async (request: RuntimeRequest, sender, sendResponse) => {
-    console.log("contentscript onMessage called");
-    if (request.message === "start-recording") {
-      const actionRecorder = new ActionsRecorder();
-      actionRecorder.activate();
-    }
-  }
-);
-
-/////////////////////////////////////////////////// Actions Recorder //////////////////////////////////////////////
-const ActionNodeProps = {
-  Common: {
-    nodeName: "",
-    selector: "",
-  },
-  Type: {
-    Text: "",
-    "Overwrite existing text": false,
-  },
-  Click: {
-    "Wait For New Page To load": false,
-    "Wait For File Download": false,
-    Description: "",
-  },
-  Scroll: {
-    "Scroll Direction": {
-      Top: false,
-      Bottom: false,
-    },
-    Description: "",
-  },
-  Hover: {
-    Description: "",
-  },
-  Prompts: {
-    "Response Type": {
-      Accept: false,
-      Decline: false,
-    },
-    "Response Text": "",
-  },
-  Select: {
-    Value: "",
-    Description: "",
-  },
-  Keypress: {
-    Key: "",
-    "Wait For Page To Load": false,
-  },
-  Date: {
-    Date: "",
-  },
-  Upload: {
-    Path: "",
-  },
-  Code: {
-    Code: "",
-  },
-};
-
-type SUPPORTED_DOM_EVENTS =
-  | "mouseup"
-  | "keydown"
-  | "scroll"
-  | "mousemove"
-  | "input";
+/**
+ *  ActionEventType: 'click', 'type', 'scroll' etc.
+ *  Common Action Properties:  Object that has info about the common properties for an Action. eg. [nodeName, selector]
+ *  Action Specific Properties:  Object that has info about the specific options for an Action. eg. ["Wait For Page To Load", "Wait For File To Download", Description]
+ * */
 
 class ActionsRecorder {
   INITIAL_WAIT = 3000;
@@ -103,7 +39,12 @@ class ActionsRecorder {
     this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
   }
 
-  activate() {
+  record() {
+    if (this.isActive) {
+      console.warn("Recording already in process...");
+      return;
+    }
+
     this.isActive = true;
     this.SUPPORTED_EVENTS.forEach(
       function (eventType: SUPPORTED_DOM_EVENTS) {
@@ -114,10 +55,36 @@ class ActionsRecorder {
       }.bind(this)
     );
     this.attachUnloadListener();
+
+    // Initially Deactivated
+    this.deActivate();
+
+    console.log("Recoding Strated...");
+  }
+
+  activate() {
+    console.log("Trying to Activate recorder...");
+    if (this.isActive) {
+      console.warn("Recorder already active...");
+      return;
+    } else {
+      this.isActive = true;
+      console.log("Recorder Activated");
+    }
   }
 
   deActivate() {
-    this.isActive = false;
+    if (!this.isActive) {
+      console.warn("Recorder already deactived");
+      return;
+    } else {
+      this.isActive = false;
+      console.log("Recorder Deactivated");
+      localStorage.setItem(
+        "isContentScriptRecording",
+        JSON.stringify(this.isActive)
+      );
+    }
   }
 
   async windowRecorderHandler(eventType: SUPPORTED_DOM_EVENTS, e: Event) {
@@ -150,11 +117,14 @@ class ActionsRecorder {
   }
 
   async clickHandler(e: Event) {
-    if (!e.currentTarget) return;
+    if (!e.target) return;
 
-    let el = e.currentTarget as HTMLElement;
+    let el = e.target as HTMLElement;
 
-    if (el.nodeName === "BUTTON" || el.getAttribute("type") == "button") {
+    if (
+      (el.nodeName !== "#document" && el.nodeName === "BUTTON") ||
+      el?.getAttribute("type") == "button"
+    ) {
       console.log("User clicked a Button: ", el.innerText);
     } else if (el.nodeName === "A") {
       console.log("User clicked a Link: ", (el as HTMLLinkElement).href);
@@ -166,40 +136,53 @@ class ActionsRecorder {
     }
 
     const shortSelector = new ShortestSelector();
-    const cssSelector = shortSelector.getSelector(el, null, null);
-    if (this.isInteractionElement(el, cssSelector)) {
-      let optionProps = getOptionProps("Click");
+    const cssSelector = shortSelector.getSelector(el, undefined);
+    if (!cssSelector) {
+      console.log(
+        `%c Could not generate Selector for Element: ${el}`,
+        "color: yellow; font-size: 0.85rem;"
+      );
 
-      let descriptionProp: { Description: string } = {
+      return;
+    }
+    if (cssSelector && this.isInteractionElement(el, cssSelector)) {
+      let commonProps: ActionCommonProp = {
+        nodeName: el.nodeName,
+        selector: cssSelector,
+      };
+      let clickProps: ActionClickProp = {
+        "Wait For New Page To load": false,
+        "Wait For File Download": false,
         Description: getActionDescription(el),
       };
-
-      let actionProps: { props: (ActionCommonProp & ActionClickProp) | {} } = {
-        props: combineProps("Click", getCommonProps(el), {
-          ...optionProps,
-          ...descriptionProp,
-        }),
-      };
-
-      let action = {
-        name: "click",
+      let action: Action = {
+        name: "Click",
         actionType: "Interaction",
-        ...actionProps,
+        props: { ...commonProps, ...clickProps },
       };
 
       console.log(action);
-      // this.saveActionDetailsToStorage(actionDetails);
-      await sendRuntimeMessage("new-recorded-action", action);
+      this.saveActionDetailsToStorage(action);
+      let contentScriptMessage: ContentScriptMessage = {
+        status: "new-recorded-action",
+        payload: action,
+      };
+      await sendRuntimeMessage(contentScriptMessage);
     }
   }
 
   isInteractionElement(element: HTMLElement, cssSelector: string) {
-    if (typeof cssSelector !== "string") return;
+    if (
+      cssSelector.includes("button") ||
+      // cssSelector.includes("a") ||
+      cssSelector.includes("input")
+    )
+      return true;
 
     if (
-      document.querySelector(`button > ${cssSelector}`) ||
-      document.querySelector(`a > ${cssSelector}`) ||
-      document.querySelector(`input > ${cssSelector}`) ||
+      document.querySelector(`button  ${cssSelector}`) || // removed '>' direct-descendant
+      document.querySelector(`a  ${cssSelector}`) || // removed '>' direct-descendant
+      document.querySelector(`input  ${cssSelector}`) || // removed '>' direct-descendant
       element.nodeName === "BUTTON" ||
       element.getAttribute("type") == "button" ||
       element.nodeName === "A" ||
@@ -208,7 +191,8 @@ class ActionsRecorder {
       element.getAttribute("type") == "input"
     )
       return true;
-    else return false;
+
+    return false;
   }
 
   textInputHandler() {}
@@ -219,54 +203,130 @@ class ActionsRecorder {
 
   attachUnloadListener() {
     console.log("attachUnloadListener called");
-    const pollingDiv = document.createElement("div");
-    pollingDiv.id = "actionflow-compose-status";
-    pollingDiv.setAttribute("actionflow-done", "false");
-    pollingDiv.setAttribute("actionflow-reloading", "false");
-    document.body.append(pollingDiv);
+    // const pollingDiv = document.createElement("div");
+    // pollingDiv.id = "actionflow-compose-status";
+    // pollingDiv.setAttribute("actionflow-done", "false");
+    // pollingDiv.setAttribute("actionflow-reloading", "false");
+    // document.body.append(pollingDiv);
 
     window.addEventListener("beforeunload", (e) => {
       console.log("navigating away form page.");
-      let actionflowEl = document.querySelector("#actionflow-compose-status");
-      if (actionflowEl)
-        actionflowEl.setAttribute("actionflow-reloading", "true");
+      localStorage.setItem(
+        "isContentScriptRecording",
+        JSON.stringify(this.isActive)
+      );
+      // let actionflowEl = document.querySelector("#actionflow-compose-status");
+      // if (actionflowEl)
+      //   actionflowEl.setAttribute("actionflow-reloading", "true");
       // e.preventDefault();
       // return (event.returnValue = "");
     });
   }
 
-  saveActionDetailsToStorage(actionDetails: any) {
+  saveActionDetailsToStorage(newAction: Action) {
     const prevSerialized = localStorage.getItem("composeData");
 
     if (!prevSerialized) {
-      let firstKey = `${PAGE_URL}-node-0`;
-      let newCompose = { firstKey: actionDetails };
-      const serialized = JSON.stringify(newCompose);
-      localStorage.setItem("composeData", serialized);
+      let newCompose = { [`${PAGE_URL}-node-0`]: newAction };
+      localStorage.setItem("composeData", JSON.stringify(newCompose));
       return;
     }
 
     const compose = JSON.parse(prevSerialized);
-    const actionExist = Object.values(compose).some(
-      (n: any) => n.xpath === actionDetails["Common"].xpath
-    );
-
-    if (!actionExist) {
-      const newKey = `${PAGE_URL}-node-${Object.values(compose).length}`;
-      compose[newKey] = actionDetails;
-      const serialized = JSON.stringify(compose);
-      localStorage.setItem("composeData", serialized);
-    }
+    compose[`${PAGE_URL}-node-${Object.values(compose).length}`] = newAction;
+    localStorage.setItem("composeData", JSON.stringify(compose));
   }
 }
 
-/**
- *  actionType: click, type, scroll etc.
- *  actionNodeCommon:  Object that has info about the common properties for an Action Element. eg. [nodeName, classes, xpath]
- *  actionOptionValues:  Object that has info about the specific options for an Action Element. eg. ["Wait For Page To Load", "Wait For File To Download",...]
- * */
+console.log("///////////// actions recorder.js /////////////");
 
-function getActionDescription(element: HTMLElement) {
+const isContentScriptRecording = JSON.parse(
+  localStorage.getItem("isContentScriptRecording")
+);
+const actionRecorder = new ActionsRecorder();
+actionRecorder.record();
+
+if (isContentScriptRecording) actionRecorder.activate();
+
+chrome.runtime.onMessage.addListener(
+  async (request: ChromeExtensionMessage, sender, sendResponse) => {
+    console.log("contentscript onMessage called");
+    if (request.message === "start-recording") {
+      actionRecorder.activate();
+    }
+
+    if (request.message === "stop-recording") {
+      actionRecorder.deActivate();
+    }
+
+    if (request.message === "get-recording-status") {
+      const currentRecordingStatus: ContentScriptMessage = {
+        status: "current-recording-status",
+        payload: actionRecorder.isActive,
+      };
+      await sendRuntimeMessage(currentRecordingStatus);
+    }
+  }
+);
+
+// const ActionNodeProps = {
+//   Common: {
+//     nodeName: "",
+//     selector: "",
+//   },
+//   Type: {
+//     Text: "",
+//     "Overwrite existing text": false,
+//   },
+//   Click: {
+//     "Wait For New Page To load": false,
+//     "Wait For File Download": false,
+//     Description: "",
+//   },
+//   Scroll: {
+//     "Scroll Direction": {
+//       Top: false,
+//       Bottom: false,
+//     },
+//     Description: "",
+//   },
+//   Hover: {
+//     Description: "",
+//   },
+//   Prompts: {
+//     "Response Type": {
+//       Accept: false,
+//       Decline: false,
+//     },
+//     "Response Text": "",
+//   },
+//   Select: {
+//     Value: "",
+//     Description: "",
+//   },
+//   Keypress: {
+//     Key: "",
+//     "Wait For Page To Load": false,
+//   },
+//   Date: {
+//     Date: "",
+//   },
+//   Upload: {
+//     Path: "",
+//   },
+//   Code: {
+//     Code: "",
+//   },
+// };
+
+type SUPPORTED_DOM_EVENTS =
+  | "mouseup"
+  | "keydown"
+  | "scroll"
+  | "mousemove"
+  | "input";
+
+function getActionDescription(element: HTMLElement): string {
   if (!element) {
     console.warn(
       "No element was provided: getActionDescription(missing --> element)"
@@ -274,7 +334,7 @@ function getActionDescription(element: HTMLElement) {
     return "";
   }
 
-  let description: string = "";
+  let description = "";
 
   if (element.textContent !== "" || element.textContent !== undefined)
     description = element.textContent!;
@@ -288,63 +348,16 @@ function getActionDescription(element: HTMLElement) {
   return description;
 }
 
-function getOptionProps(actionType: ActionEventTypes): ActionClickProp | {} {
-  let actionOptionValues = {};
-
-  if (actionType === "Click") {
-    Object.keys(ActionNodeProps["Click"]).forEach((key) => {
-      if (key === "Wait For New Page To load") actionOptionValues[key] = false;
-      else if (key === "Wait For File Download")
-        actionOptionValues[key] = false;
-      else if (key === "Description") actionOptionValues[key] = "";
-    });
-  }
-
-  return actionOptionValues;
-}
-
-function combineProps(
-  actionType: ActionEventTypes,
-  actionNodeCommon: ActionCommonProp | {},
-  actionOptionValues
-): (ActionCommonProp & ActionClickProp) | {} {
-  actionNodeCommon["options"] = {};
-  Object.keys(ActionNodeProps[actionType]).forEach((key) => {
-    actionNodeCommon["options"][key] = actionOptionValues[key];
-  });
-
-  return actionNodeCommon;
-}
-
-function getCommonProps(element: HTMLElement): ActionCommonProp | {} {
-  let actionNodeCommon = {} as ActionCommonProp;
-
-  let nodeClassList = "";
-  element.classList?.forEach((c) => {
-    nodeClassList += "." + c;
-  });
-
-  const shortSelector = new ShortestSelector();
-  const cssSelector = shortSelector.getSelector(element, null, null);
-
-  Object.keys(ActionNodeProps["Common"]).forEach((key) => {
-    if (key === "nodeName") actionNodeCommon[key] = element.nodeName;
-    else if (key === "selector") actionNodeCommon[key] = cssSelector;
-  });
-
-  return actionNodeCommon;
-}
-
-async function sendRuntimeMessage(status, payload) {
+async function sendRuntimeMessage(content: ContentScriptMessage) {
   try {
-    await chrome.runtime.sendMessage(null, { status, payload });
+    await chrome.runtime.sendMessage(null, content);
   } catch (e) {
     console.warn(
       "Error sending Message: ",
       "status: ",
-      status,
+      content.status,
       ", payload: ",
-      payload,
+      content.payload,
       ", Error: ",
       e
     );
@@ -352,13 +365,21 @@ async function sendRuntimeMessage(status, payload) {
 }
 
 class ShortestSelector {
-  DISABLE_CLASS_SEL = false;
+  DISABLE_CLASS_SEL = true;
   DISABLE_ID_SEL = true;
-  DISABLE_ATTR_SEL = true;
-  TARGET_NODE;
+  DISABLE_ATTR_SEL = false;
+  TARGET_NODE: HTMLElement | undefined;
 
-  getSelector(element: HTMLElement | undefined, carriedSelector, targetNode) {
-    if (!element) return;
+  getSelector(
+    element: HTMLElement | undefined,
+    carriedSelector: string | undefined
+  ): string | undefined {
+    if (
+      !element ||
+      element.nodeName === "#document" ||
+      element.nodeName === "html"
+    )
+      return;
 
     if (element.nodeName.toLowerCase() === "body") {
       this.clearTargetNode();
@@ -396,7 +417,7 @@ class ShortestSelector {
     }
 
     // Prepare carrySelector for next iteration
-    let carrySelector;
+    let carrySelector: string;
     if (candidate !== "") {
       // Check if candidate is eligible
       if (this.isUniqForTarget(candidate, this.TARGET_NODE)) {
@@ -408,17 +429,17 @@ class ShortestSelector {
       carrySelector =
         ` > ${currentTAG}` + (carriedSelector ? carriedSelector : "");
 
-    return this.getSelector(
-      element.parentNode as HTMLElement,
-      carrySelector,
-      this.TARGET_NODE
-    );
+    return this.getSelector(element.parentNode as HTMLElement, carrySelector);
   }
 
-  id(currrElement: HTMLElement, carriedSelector: string) {
-    if (this.DISABLE_ID_SEL) return;
-
+  id(
+    currrElement: HTMLElement,
+    carriedSelector: string | undefined
+  ): string | undefined {
     const HAS_ID = currrElement.id !== "" && currrElement.id !== undefined;
+
+    if (!HAS_ID || this.DISABLE_ID_SEL) return;
+
     if (HAS_ID) {
       let idLeadSelector = "#" + currrElement.id;
 
@@ -429,7 +450,10 @@ class ShortestSelector {
     }
   }
 
-  attribute(currrElement: HTMLElement, carriedSelector: string) {
+  attribute(
+    currrElement: HTMLElement,
+    carriedSelector: string | undefined
+  ): string | undefined {
     if (this.DISABLE_ATTR_SEL) return;
 
     for (const attr of ["aria-label", "title"]) {
@@ -450,8 +474,8 @@ class ShortestSelector {
   class(
     currrElement: HTMLElement,
     currentTAG: string,
-    carriedSelector: string
-  ) {
+    carriedSelector: string | undefined
+  ): string | undefined {
     if (this.DISABLE_CLASS_SEL) return;
 
     let foundUniqClass = false;
@@ -479,7 +503,7 @@ class ShortestSelector {
     this.TARGET_NODE = undefined;
   }
 
-  getIndex(node: HTMLElement) {
+  getIndex(node: HTMLElement): number {
     let i = 1;
     let tagName = node.tagName;
 
@@ -495,15 +519,12 @@ class ShortestSelector {
     return i;
   }
 
-  isUniqForTarget(selector: string, targetNode: HTMLElement) {
-    if (typeof selector !== "string") return false;
-
-    try {
-      if (document.querySelector(selector) === targetNode) return true;
-      else return false;
-    } catch (err) {
-      console.warn(err);
-      return false;
-    }
+  isUniqForTarget(
+    selector: string,
+    targetNode: HTMLElement | undefined
+  ): boolean {
+    if (!document.querySelector(selector) && !targetNode) return false;
+    if (document.querySelector(selector) === targetNode) return true;
+    else return false;
   }
 }
