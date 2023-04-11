@@ -30,7 +30,7 @@ function handlePopupActionWindow() {
         if (windows.length === 0) {
           chrome.windows.create(
             {
-              url: chrome.runtime.getURL("./FRONTEND/composer/dist/index.html"),
+              url: chrome.runtime.getURL("./dist/index.html"),
               type: "popup",
               height: 600,
               width: 500
