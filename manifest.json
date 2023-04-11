@@ -27,25 +27,21 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://*/*"
-      ],
-      "js": [
-        "./contentscripts/firstContent.js"
-      ]
+      "matches": ["https://*/*"],
+      "js": ["./contentscripts/firstContent.js"]
     }
   ],
-  "host_permissions": [
-    "https://*/*"
-  ],
+  "host_permissions": ["https://*/*"],
   "icons": {
     "48": "/icons/48.png",
     "128": "/icons/128.png"
   },
   "web_accessible_resources": [
     {
-      "resources": [ "contentscripts/ActionsRecorder.js" ],
-      "matches": [ "https://*/*" ]
+      "resources": [
+        "contentscripts/action-recorder.js"
+      ],
+      "matches": ["https://*/*"]
     }
   ],
   "options_page": "popup.html"

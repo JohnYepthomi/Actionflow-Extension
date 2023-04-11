@@ -12,7 +12,6 @@ try {
   console.log("catchblock : " + e);
 }
 
-
 /* UTILITIES */
 function handleRuntimeMessages() {
   chrome.runtime.onMessage.addListener(async function (request, sender, sendResponse) {

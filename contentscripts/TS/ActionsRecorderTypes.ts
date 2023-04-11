@@ -1,13 +1,13 @@
-export type ChromeExtensionMessage = {
+type ChromeExtensionMessage = {
   message: "start-recording" | "stop-recording" | "get-recording-status";
 };
 
-export type ContentScriptMessage = {
+type ContentScriptMessage = {
   status: "new-recorded-action" | "current-recording-status";
   payload: Action | Boolean;
 };
 
-export type ActionEventTypes =
+type ActionEventTypes =
   | "Common"
   | "Click"
   | "Scroll"
@@ -20,25 +20,25 @@ export type ActionEventTypes =
   | "Code"
   | "Prompts";
 
-export type ActionTypes = "Interaction" | "Operators";
+type ActionTypes = "Interaction" | "Operators";
 
-export type ActionCommonProp = {
+type ActionCommonProp = {
   nodeName: string;
   selector: string;
 };
 
-export type ActionClickProp = {
+type ActionClickProp = {
   "Wait For New Page To load": Boolean;
   "Wait For File Download": Boolean;
   Description: string;
 };
 
-export type ActionClickData = ActionCommonProp & ActionClickProp;
+type ActionClickData = ActionCommonProp & ActionClickProp;
 
-export type AllActionProps = ActionClickProp;
+type AllActionProps = ActionClickProp;
 type AllActionData = ActionClickData;
 
-export type Action = {
+type Action = {
   name: ActionEventTypes;
   actionType: ActionTypes;
   props: AllActionData;
