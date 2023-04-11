@@ -1,7 +1,6 @@
 /// <reference path="./ShortestCssSelector.ts" />
 /// <reference path="./ActionsRecorderTypes.ts" />
 /// <reference path="./Handlers/RuntimeMessageHandler.ts" />
-/// <reference path="./Handlers/WindowUnloadHandler.ts" />
 
 type SUPPORTED_DOM_EVENTS =
   | "mouseup"
@@ -41,7 +40,7 @@ class ActionsRecorder {
     this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
   }
 
-  record(windowRecorderHandler: (e: Event)=>{}) {
+  record(windowRecorderHandler: (e: Event)=> void) {
     if (this.isActive) {
       console.warn("Recording already in process...");
       return;
@@ -56,8 +55,6 @@ class ActionsRecorder {
         );
       }.bind(this)
     );
-
-    this.attachUnloadListener();
 
     // Initially Deactivated
     this.deActivate();
@@ -181,7 +178,7 @@ class ActionsRecorder {
 
   scrollHandler() {}
 
-  attachUnloadListener() {
+  attachUnloadListener(BeforeWindowUnloadHandler: () => void) {
     console.log("attachUnloadListener called");
     // const pollingDiv = document.createElement("div");
     // pollingDiv.id = "actionflow-compose-status";
