@@ -41,7 +41,7 @@ class ActionsRecorder {
     this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
   }
 
-  record() {
+  record(windowRecorderHandler: (e: Event)=>{}) {
     if (this.isActive) {
       console.warn("Recording already in process...");
       return;
