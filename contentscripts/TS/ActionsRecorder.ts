@@ -40,13 +40,7 @@ class ActionsRecorder {
     this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
   }
 
-  record(windowRecorderHandler: (e: Event)=> void) {
-    if (this.isActive) {
-      console.warn("Recording already in process...");
-      return;
-    }
-
-    this.isActive = true;
+  async recordListeners(windowRecorderHandler: (e: Event)=> void) {
     this.SUPPORTED_EVENTS.forEach(
       function (eventType: SUPPORTED_DOM_EVENTS) {
         document.addEventListener(
@@ -55,22 +49,23 @@ class ActionsRecorder {
         );
       }.bind(this)
     );
-
-    // Initially Deactivated
-    this.deActivate();
-
-    console.log(
-      "Recoding Started but deactivated awaiting user initiated activation."
-    );
   }
 
-  activate() {
+  async activate() {
     console.log("Trying to Activate recorder...");
     if (this.isActive) {
       console.warn("Recorder already active...");
       return;
     } else {
       this.isActive = true;
+      
+      /** 
+      * A Change in a the current tab's url would change the local storage and 
+      * we will loose recording status when navigating to another url.
+      * So, we store the status in the backgroundscript which is the only Source of truth.
+      * */
+      await messageBackground({message: "recording-started"});
+
       console.log("Recorder Activated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -79,12 +74,20 @@ class ActionsRecorder {
     }
   }
 
-  deActivate() {
+  async deActivate() {
     if (!this.isActive) {
       console.warn("Recorder already deactived");
       return;
     } else {
       this.isActive = false;
+
+      /** 
+      * A Change in a the current tab's url would change the local storage and 
+      * we will loose recording status when navigating to another url.
+      * So, we store the status in the backgroundscript which is the only Source of truth.
+      * */
+      await messageBackground({ message: "recording-stopped" });
+
       console.log("Recorder Deactivated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -123,25 +126,25 @@ class ActionsRecorder {
       return;
     }
     if (cssSelector && this.isInteractionElement(el, cssSelector)) {
-      let commonProps: ActionCommonProp = {
+      let commonProps: CommonProp = {
         nodeName: el.nodeName,
         selector: cssSelector,
       };
-      let clickProps: ActionClickProp = {
+      let clickProps: ClickProp = {
         "Wait For New Page To load": false,
         "Wait For File Download": false,
         Description: getActionDescription(el),
       };
       let action: Action = {
-        name: "Click",
-        actionType: "Interaction",
+        actionType: "Click",
         props: { ...commonProps, ...clickProps },
       };
 
       console.log(action);
-      this.saveActionDetailsToStorage(action);
+      // this.saveActionDetailsToStorage(action);
       let contentScriptMessage: ContentScriptMessage = {
         status: "new-recorded-action",
+        actionType: "Click",
         payload: action,
       };
       await sendRuntimeMessage(contentScriptMessage);
@@ -151,7 +154,7 @@ class ActionsRecorder {
   isInteractionElement(element: HTMLElement, cssSelector: string) {
     if (
       cssSelector.includes("button") ||
-      // cssSelector.includes("a") ||
+      cssSelector.includes("textarea") ||
       cssSelector.includes("input")
     )
       return true;
@@ -161,6 +164,7 @@ class ActionsRecorder {
       document.querySelector(`a  ${cssSelector}`) || // removed '>' direct-descendant
       document.querySelector(`input  ${cssSelector}`) || // removed '>' direct-descendant
       element.nodeName === "BUTTON" ||
+      element.nodeName === "TEXTAREA" ||
       element.getAttribute("type") == "button" ||
       element.nodeName === "A" ||
       element.getAttribute("type") == "a" ||

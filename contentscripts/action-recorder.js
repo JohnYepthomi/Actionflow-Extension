@@ -118,16 +118,6 @@ class ShortestSelector {
             return false;
     }
 }
-function BeforeWindowUnloadHandler() {
-    if (!chrome.runtime?.id) {
-        document.removeEventListener("beforeunload", BeforeWindowUnloadHandler);
-        console.log("BeforeWindowUnloadHandler() removed");
-        return;
-    }
-    console.log("BeforeWindowUnloadHandler() still attached");
-    console.log("navigating away form page. isContentScriptRecording: ", this.isActive);
-    localStorage.setItem("isContentScriptRecording", JSON.stringify(this.isActive));
-}
 class ActionsRecorder {
     constructor() {
         this.INITIAL_WAIT = 3000;
@@ -142,29 +132,22 @@ class ActionsRecorder {
         this.startTime = Date.now();
         this.endTime = this.startTime + this.INITIAL_WAIT;
         this.isActive = false;
-        this.record.bind(this);
+        this.recordListeners.bind(this);
         this.attachUnloadListener.bind(this);
         this.PAGE_URL = window.location.href || "";
+        this.recordListeners();
     }
     overrideDefault(INITIAL_WAIT, INTERVAL_WAIT, SUPPORTED_EVENTS) {
         this.INITIAL_WAIT = INITIAL_WAIT;
         this.INTERVAL_WAIT = INTERVAL_WAIT;
         this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
     }
-    record() {
-        if (this.isActive) {
-            console.warn("Recording already in process...");
-            return;
-        }
-        this.isActive = true;
+    recordListeners(windowRecorderHandler) {
         this.SUPPORTED_EVENTS.forEach(function (eventType) {
             document.addEventListener(eventType, windowRecorderHandler);
         }.bind(this));
-        this.attachUnloadListener();
-        this.deActivate();
-        console.log("Recoding Started but deactivated awaiting user initiated activation.");
     }
-    activate() {
+    async activate() {
         console.log("Trying to Activate recorder...");
         if (this.isActive) {
             console.warn("Recorder already active...");
@@ -172,19 +155,21 @@ class ActionsRecorder {
         }
         else {
             this.isActive = true;
+            await messageBackground({ message: "recording-started" });
             console.log("Recorder Activated");
-            localStorage.setItem("isContentScriptRecording", JSON.stringify(this.isActive));
+            localStorage.setItem("isContentScriptRecording", "true");
         }
     }
-    deActivate() {
+    async deActivate() {
         if (!this.isActive) {
             console.warn("Recorder already deactived");
             return;
         }
         else {
             this.isActive = false;
+            await messageBackground({ message: "recording-stopped" });
             console.log("Recorder Deactivated");
-            localStorage.setItem("isContentScriptRecording", JSON.stringify(this.isActive));
+            localStorage.setItem("isContentScriptRecording", "false");
         }
     }
     async clickHandler(e) {
@@ -218,14 +203,13 @@ class ActionsRecorder {
                 Description: getActionDescription(el),
             };
             let action = {
-                name: "Click",
-                actionType: "Interaction",
+                actionType: "Click",
                 props: { ...commonProps, ...clickProps },
             };
             console.log(action);
-            this.saveActionDetailsToStorage(action);
             let contentScriptMessage = {
                 status: "new-recorded-action",
+                actionType: "Click",
                 payload: action,
             };
             await sendRuntimeMessage(contentScriptMessage);
@@ -233,12 +217,14 @@ class ActionsRecorder {
     }
     isInteractionElement(element, cssSelector) {
         if (cssSelector.includes("button") ||
+            cssSelector.includes("textarea") ||
             cssSelector.includes("input"))
             return true;
         if (document.querySelector(`button  ${cssSelector}`) ||
             document.querySelector(`a  ${cssSelector}`) ||
             document.querySelector(`input  ${cssSelector}`) ||
             element.nodeName === "BUTTON" ||
+            element.nodeName === "TEXTAREA" ||
             element.getAttribute("type") == "button" ||
             element.nodeName === "A" ||
             element.getAttribute("type") == "a" ||
@@ -250,7 +236,7 @@ class ActionsRecorder {
     textInputHandler() { }
     mouseMoveHandler() { }
     scrollHandler() { }
-    attachUnloadListener() {
+    attachUnloadListener(BeforeWindowUnloadHandler) {
         console.log("attachUnloadListener called");
         window.addEventListener("beforeunload", BeforeWindowUnloadHandler);
     }
@@ -285,20 +271,20 @@ function getActionDescription(element) {
 const chromeListener = async function (request, _sender, _sendResponse) {
     console.log("contentscript onMessage called");
     if (!chrome.runtime?.id) {
+        console.log("chromeListener context invalidated. Removing listener...");
         chrome.runtime.onMessage.removeListener(chromeListener);
     }
-    if (request.message === "start-recording") {
+    else if (request.message === "start-recording") {
         this.activate();
     }
-    if (request.message === "stop-recording") {
+    else if (request.message === "stop-recording") {
         this.deActivate();
     }
-    if (request.message === "get-recording-status") {
-        const currentRecordingStatus = {
-            status: "current-recording-status",
-            payload: this.isActive,
-        };
-        await sendRuntimeMessage(currentRecordingStatus);
+    else if (request.status === "compose-completed") {
+        console.log("compose-completed chrome runtime called on firstContent script");
+        localStorage.setItem("isComposeCompleted", "true");
+        if (request.payload)
+            localStorage.setItem("composeData", JSON.stringify(request.payload));
     }
 };
 async function sendRuntimeMessage(content) {
@@ -309,31 +295,59 @@ async function sendRuntimeMessage(content) {
         console.warn("Error sending Message: ", "status: ", content.status, ", payload: ", content.payload, ", Error: ", e);
     }
 }
-console.log("///////////// actions recorder.js /////////////");
-const isContentScriptRecording = localStorage.getItem("isContentScriptRecording") !== "undefined"
-    ? JSON.parse(localStorage.getItem("isContentscriptRecording"))
-    : false;
-console.log({ isContentScriptRecording });
-let recObj = new ActionsRecorder();
-recObj.record();
-if (isContentScriptRecording)
-    recObj.activate();
-chrome.runtime.onMessage.addListener(chromeListener.bind(recObj));
-async function windowRecorderHandler(e) {
-    if (!chrome.runtime?.id) {
-        document.removeEventListener(e.type, windowRecorderHandler);
-        return;
-    }
-    if (!recObj.isActive)
-        return;
-    recObj.endTime = Date.now() + recObj.INTERVAL_WAIT;
-    switch (e.type) {
-        case "input":
-            console.log("%c User input action recorded", "color: teal; font-style=italic;");
-            break;
-        case "mouseup":
-            console.log("%c mouseup action recorded", "color: green; font-style=italic;");
-            await recObj.clickHandler(e);
-            break;
-    }
+async function messageBackground(message) {
+    return await new Promise(async (res) => {
+        await chrome.runtime.sendMessage(message, (response) => {
+            // if (chrome.runtime.lastError) {
+            //     // Handle the error
+            //     console.log({ message });
+            //     console.error(chrome.runtime.lastError);
+            //     return;
+            // }
+
+            if (response)
+                res(response);
+            else
+                res("no-response");
+        });
+    });
 }
+console.log("///////////// action-recorder.js /////////////");
+(async () => {
+    const isContentScriptRecording = await messageBackground({message: 'bg-recording-status'});
+    console.log({ isContentScriptRecording });
+    let recObj = new ActionsRecorder();
+    recObj.recordListeners(windowRecorderHandler);
+    recObj.attachUnloadListener(BeforeWindowUnloadHandler);
+    if (isContentScriptRecording && isContentScriptRecording !== "no-response" && isContentScriptRecording.recording)
+        recObj.activate();
+    chrome.runtime.onMessage.addListener(chromeListener.bind(recObj));
+    async function windowRecorderHandler(e) {
+        if (!chrome.runtime?.id) {
+            document.removeEventListener(e.type, windowRecorderHandler);
+            return;
+        }
+        if (!recObj.isActive)
+            return;
+        recObj.endTime = Date.now() + recObj.INTERVAL_WAIT;
+        switch (e.type) {
+            case "input":
+                console.log("%c User input action recorded", "color: teal; font-style=italic;");
+                break;
+            case "mouseup":
+                console.log("%c mouseup action recorded", "color: green; font-style=italic;");
+                await recObj.clickHandler(e);
+                break;
+        }
+    }
+    function BeforeWindowUnloadHandler() {
+        if (!chrome.runtime?.id) {
+            document.removeEventListener("beforeunload", BeforeWindowUnloadHandler);
+            console.log("BeforeWindowUnloadHandler() removed");
+            return;
+        }
+        console.log("BeforeWindowUnloadHandler() still attached");
+        console.log("navigating away form page. isContentScriptRecording: ", recObj.isActive);
+        localStorage.setItem("isContentScriptRecording", JSON.stringify(recObj.isActive));
+    }
+})();

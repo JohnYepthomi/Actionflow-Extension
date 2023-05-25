@@ -1,5 +1,5 @@
 {
-  "name": "Actionflow Composer",
+  "name": "Actionflow Composer 2",
   "description": "Create Automation Workflow",
   "version": "1.0",
   "manifest_version": 3,
@@ -23,6 +23,15 @@
     "default_icon": {
       "48": "/icons/48.png",
       "128": "/icons/128.png"
+    }
+  },
+  "commands": {
+    "toggle-window": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "MacCtrl+Shift+K"
+      },
+      "description": "Toggle Window"
     }
   },
   "content_scripts": [

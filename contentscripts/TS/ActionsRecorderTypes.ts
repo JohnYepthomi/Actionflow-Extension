@@ -1,14 +1,18 @@
 type ChromeExtensionMessage = {
-  message: "start-recording" | "stop-recording" | "get-recording-status";
+  message?: "start-recording" | "stop-recording" | "get-recording-status";
+  status?: "compose-completed";
+  payload?: Action | string | boolean;
 };
 
 type ContentScriptMessage = {
   status: "new-recorded-action" | "current-recording-status";
+  actionType: ActionEventTypes;
   payload: Action | Boolean;
 };
 
 type ActionEventTypes =
-  | "Common"
+  | "Visit"
+  | "NewTab"
   | "Click"
   | "Scroll"
   | "Keypress"
@@ -20,26 +24,24 @@ type ActionEventTypes =
   | "Code"
   | "Prompts";
 
-type ActionTypes = "Interaction" | "Operators";
-
-type ActionCommonProp = {
+/* COMMON PROPS */
+type CommonProp = {
   nodeName: string;
   selector: string;
 };
 
-type ActionClickProp = {
-  "Wait For New Page To load": Boolean;
-  "Wait For File Download": Boolean;
+/* ACTION PROPS */
+type ClickProp = {
+  "Wait For New Page To load": boolean;
+  "Wait For File Download": boolean;
   Description: string;
 };
 
-type ActionClickData = ActionCommonProp & ActionClickProp;
+type ActionClickProp = CommonProp & ClickProp;
 
 type AllActionProps = ActionClickProp;
-type AllActionData = ActionClickData;
 
 type Action = {
-  name: ActionEventTypes;
-  actionType: ActionTypes;
-  props: AllActionData;
+  actionType: ActionEventTypes;
+  props: AllActionProps;
 };
