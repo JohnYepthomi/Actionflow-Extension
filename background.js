@@ -18,41 +18,42 @@ try {
   console.log("Caught Error : " + e);
 }
 
+console.log("github push check");
+
 const TabActions = {
   isNavigation: false,
   activeWindowId: null,
   recordedTabs: [],
   tabHistory: [],
-  addToHistory: function(tabId, url, windowId){
+  addToHistory: function (tabId, url, windowId) {
     // when a new tab is created, the startpage url would be "chrome://newtab/",
     // but once a user visits a url, the start page url changes at runtime to "chrome://new-tab-page/".
     // We only store the new start page url in the 'history' because if we stored the old startpage url it won't ever match with the new startpage url.
-    if(!this.tabHistory.some(history => history.tabId === tabId)){
-      this.tabHistory.push({tabId, windowId, urls: [url], pos: 0});
-      console.log("New Tab added To History: ", JSON.stringify(this.tabHistory));
-    }
-    else{
-      this.tabHistory = this.tabHistory.map(history => {
-        if(history.tabId === tabId){
-
+    if (!this.tabHistory.some((history) => history.tabId === tabId)) {
+      this.tabHistory.push({ tabId, windowId, urls: [url], pos: 0 });
+      console.log(
+        "New Tab added To History: ",
+        JSON.stringify(this.tabHistory)
+      );
+    } else {
+      this.tabHistory = this.tabHistory.map((history) => {
+        if (history.tabId === tabId) {
           // Discard urls after the curent pos on a new naviagtion
-          if(this.isNavigation){
+          if (this.isNavigation) {
             const removedItems = history.urls.splice(history.pos + 1);
             console.log("remvoedItems: ", removedItems);
             this.isNavigation = false;
           }
 
-          history.urls.push(url)
-          return {...history, urls: history.urls, pos: history.pos + 1};
-        }
-        else return history;
+          history.urls.push(url);
+          return { ...history, urls: history.urls, pos: history.pos + 1 };
+        } else return history;
       });
       console.log("Updated History: ", JSON.stringify(this.tabHistory));
     }
   },
   navigate: async function (tabInfo) {
-    if (!tabInfo.url || !isSupportedSite(tabInfo.url))
-      return;
+    if (!tabInfo.url || !isSupportedSite(tabInfo.url)) return;
     this.isNavigation = true;
     this.addToHistory(tabInfo.id, tabInfo.url);
     this.sendTabInfo(tabInfo, "Navigate");
@@ -62,7 +63,10 @@ const TabActions = {
   },
   newTab: async function (tabInfo) {
     console.log("TabActions.newTab");
-    tabInfo.url = tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
+    tabInfo.url =
+      tabInfo.url === "chrome://newtab/"
+        ? "chrome://new-tab-page/"
+        : tabInfo.url;
     this.addToHistory(tabInfo.id, tabInfo.url, tabInfo.windowId);
     this.sendTabInfo(tabInfo, "NewTab");
   },
@@ -80,7 +84,10 @@ const TabActions = {
   selectTab: function (tabInfo) {
     let isNewWindow = false;
 
-    if (this.tabHistory.length > 1 && !this.tabHistory.some(his => his.windowId === tabInfo.windowId)) {
+    if (
+      this.tabHistory.length > 1 &&
+      !this.tabHistory.some((his) => his.windowId === tabInfo.windowId)
+    ) {
       console.log("selectTab -> NewWindow -> NewTab");
       this.newWindow(tabInfo);
       isNewWindow = true;
@@ -89,68 +96,102 @@ const TabActions = {
     // If the tab hasn't been saved, treat it as a 'NewTab' and return.
     if (!this.tabHistory.some((history) => history.tabId === tabInfo.id)) {
       console.log("selectTab -> NewTab");
-      tabInfo.url = tabInfo.url === "" || tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
-      this.tabHistory.push({tabId: tabInfo.id, windowId: tabInfo.windowId, urls: [tabInfo.url], pos: 0, fromSelect: true});
+      tabInfo.url =
+        tabInfo.url === "" || tabInfo.url === "chrome://newtab/"
+          ? "chrome://new-tab-page/"
+          : tabInfo.url;
+      this.tabHistory.push({
+        tabId: tabInfo.id,
+        windowId: tabInfo.windowId,
+        urls: [tabInfo.url],
+        pos: 0,
+        fromSelect: true,
+      });
 
       // Don't send the action if the its a new 'Window' as every new window comes with a new tab already created,
-      // So we don't need to explicitly create an action for the new tab. Our goal is not to show every 
+      // So we don't need to explicitly create an action for the new tab. Our goal is not to show every
       // action that takes place but to only show appropriate actions that can serve the actions that follows.
-      if(!isNewWindow){
+      if (!isNewWindow) {
         this.sendTabInfo(tabInfo, "NewTab");
       }
 
       return;
     }
 
-    tabInfo.url = tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
+    tabInfo.url =
+      tabInfo.url === "chrome://newtab/"
+        ? "chrome://new-tab-page/"
+        : tabInfo.url;
     this.sendTabInfo(tabInfo, "SelectTab");
   },
   closeTab: async function (tabId) {
-    try{
-      const { urls, windowId, pos } = this.tabHistory.filter(history => history.tabId === tabId)[0];
-      
+    try {
+      const { urls, windowId, pos } = this.tabHistory.filter(
+        (history) => history.tabId === tabId
+      )[0];
+
       if (this.tabHistory.some((history) => history.tabId === tabId)) {
-        this.tabHistory = this.tabHistory.filter((history) => history.tabId !== tabId);
+        this.tabHistory = this.tabHistory.filter(
+          (history) => history.tabId !== tabId
+        );
       }
 
       this.sendTabInfo({ id: tabId, url: urls[pos], windowId }, "CloseTab");
-    }catch(err){
-      console.log(err);      
+    } catch (err) {
+      console.log(err);
     }
   },
-  back: function(tabId, changed_url, history){
+  back: function (tabId, changed_url, history) {
     console.log("isBack");
-    this.sendTabInfo({tabId: history.tabId, url: history.urls[0], windowId: history.windowId}, "Back");
-    this.tabHistory = this.tabHistory.map( history => {
-      if(history.tabId === tabId)
-        return {...history, pos: history.pos - 1};
+    this.sendTabInfo(
+      {
+        tabId: history.tabId,
+        url: history.urls[0],
+        windowId: history.windowId,
+      },
+      "Back"
+    );
+    this.tabHistory = this.tabHistory.map((history) => {
+      if (history.tabId === tabId) return { ...history, pos: history.pos - 1 };
       else return history;
     });
   },
-  forward: function(tabId, changed_url, history){
+  forward: function (tabId, changed_url, history) {
     console.log("isForward");
-    this.sendTabInfo({tabId: history.tabId, url: history.urls[0], windowId: history.windowId}, "Forward");
-    this.tabHistory = this.tabHistory.map( history => {
-      if(history.tabId === tabId)
-        return {...history, pos: history.pos + 1};
+    this.sendTabInfo(
+      {
+        tabId: history.tabId,
+        url: history.urls[0],
+        windowId: history.windowId,
+      },
+      "Forward"
+    );
+    this.tabHistory = this.tabHistory.map((history) => {
+      if (history.tabId === tabId) return { ...history, pos: history.pos + 1 };
       else return history;
     });
   },
-  handleForwardBack: function(tabId, changed_url){
+  handleForwardBack: function (tabId, changed_url) {
     // STACKOVERFLOW DELETED SUBMISSION: https://stackoverflow.com/questions/25542015/in-chrome-extension-determine-if-the-user-clicked-the-browsers-back-or-forward/76397179#76397179
-    if (!changed_url || !isSupportedSite(changed_url) && changed_url !== "chrome://new-tab-page/")
+    if (
+      !changed_url ||
+      (!isSupportedSite(changed_url) &&
+        changed_url !== "chrome://new-tab-page/")
+    )
       return;
 
-    const history = this.tabHistory.filter(history => history.tabId === tabId)[0];
+    const history = this.tabHistory.filter(
+      (history) => history.tabId === tabId
+    )[0];
 
     const isBack = history.urls[history.pos - 1] === changed_url;
-    if(isBack){
+    if (isBack) {
       this.back(tabId, changed_url, history);
       return;
     }
 
     const isForward = history.urls[history.pos + 1] === changed_url;
-    if(isForward){
+    if (isForward) {
       this.forward(tabId, changed_url, history);
       return;
     }
@@ -181,47 +222,59 @@ const TabActions = {
       }
     }
   },
-  hasWindow:  function(windowId){
-    return this.tabHistory.some((t) => t.windowId === windowId)
+  hasWindow: function (windowId) {
+    return this.tabHistory.some((t) => t.windowId === windowId);
   },
-  hasHistory: function(){
-    return this.tabHistory.length > 0
-  }
+  hasHistory: function () {
+    return this.tabHistory.length > 0;
+  },
 };
 
 /* UTILITIES */
-chrome.webNavigation.onCommitted.addListener(async function(details) {
+chrome.webNavigation.onCommitted.addListener(async function (details) {
   // console.log("webNavigation", details);
   const tabId = details.tabId;
   const url = details.url;
   const TrType = details.transitionType === "typed" ? "typed" : null;
-  const Qual = details.transitionQualifiers.filter(q => q === "forward_back" || q === "from_address_bar")[0];
+  const Qual = details.transitionQualifiers.filter(
+    (q) => q === "forward_back" || q === "from_address_bar"
+  )[0];
   const CURR_TAB_INFO = await getTabFromId(tabId);
-  const startPageUrl = url === "chrome://new-tab-page/"
+  const startPageUrl = url === "chrome://new-tab-page/";
 
-  if (!CURR_TAB_INFO || !isSupportedSite(CURR_TAB_INFO.url) && !startPageUrl) return;
+  if (!CURR_TAB_INFO || (!isSupportedSite(CURR_TAB_INFO.url) && !startPageUrl))
+    return;
 
   // New Window
-  if (TrType === "typed" && TabActions.hasHistory() && !TabActions.hasWindow(CURR_TAB_INFO.windowId)){
+  if (
+    TrType === "typed" &&
+    TabActions.hasHistory() &&
+    !TabActions.hasWindow(CURR_TAB_INFO.windowId)
+  ) {
     TabActions.newWindow(CURR_TAB_INFO);
   }
 
   // New Tab
-  if (TrType === "typed" && !TabActions.tabHistory.some((tab) => tab.tabId === CURR_TAB_INFO.id && !tab.formSelect)){
-    console.log('NewTab: ', CURR_TAB_INFO);
+  if (
+    TrType === "typed" &&
+    !TabActions.tabHistory.some(
+      (tab) => tab.tabId === CURR_TAB_INFO.id && !tab.formSelect
+    )
+  ) {
+    console.log("NewTab: ", CURR_TAB_INFO);
     TabActions.newTab(CURR_TAB_INFO);
     return;
   }
 
-  // Navigate using Address Bar 
-  if(TrType === "typed" && Qual === "from_address_bar"){
+  // Navigate using Address Bar
+  if (TrType === "typed" && Qual === "from_address_bar") {
     console.log("User Navigating");
     TabActions.navigate(CURR_TAB_INFO);
     return;
   }
 
-  // Navigate History 
-  if(TrType === "typed" && Qual === "forward_back" || startPageUrl){
+  // Navigate History
+  if ((TrType === "typed" && Qual === "forward_back") || startPageUrl) {
     TabActions.handleForwardBack(tabId, url);
   }
 });
@@ -438,9 +491,7 @@ function enableActiveTabListeners() {
     { windowTypes: ["normal"] }
   );
 
-  chrome.windows.onRemoved.addListener(function(windowId) {
-
-  });
+  chrome.windows.onRemoved.addListener(function (windowId) {});
 }
 
 function isSupportedSite(url) {
