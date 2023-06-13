@@ -314,6 +314,7 @@ async function messageBackground(message) {
 }
 console.log("///////////// action-recorder.js /////////////");
 (async () => {
+    // await triggerExtensionPopup(); enable later
     const isContentScriptRecording = await messageBackground({message: 'bg-recording-status'});
     console.log({ isContentScriptRecording });
     let recObj = new ActionsRecorder();
@@ -349,5 +350,8 @@ console.log("///////////// action-recorder.js /////////////");
         console.log("BeforeWindowUnloadHandler() still attached");
         console.log("navigating away form page. isContentScriptRecording: ", recObj.isActive);
         localStorage.setItem("isContentScriptRecording", JSON.stringify(recObj.isActive));
+    }
+    async function triggerExtensionPopup() {
+        await messageBackground({message: 'launch-extension'});
     }
 })();

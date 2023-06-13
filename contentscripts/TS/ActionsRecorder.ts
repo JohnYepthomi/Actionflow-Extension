@@ -25,7 +25,7 @@ class ActionsRecorder {
   PAGE_URL: string;
 
   constructor() {
-    this.record.bind(this); // test
+    this.recordListeners.bind(this); // test
     this.attachUnloadListener.bind(this);
     this.PAGE_URL = window.location.href || "";
   }

@@ -19,57 +19,52 @@ try {
 }
 
 const TabActions = {
+  isNavigation: false,
   activeWindowId: null,
   recordedTabs: [],
-  navigate: async function (tabInfo, composeData) {
-    if (!tabInfo?.url || !isSupportedSite(tabInfo.url)) return;
-
-    // In navigate , we should already have the tab info. stored in recordedTabs[].
-    // We just have to update the url, the tab will have the same id.
-    if (
-      this.recordedTabs.some(
-        (tab) => tab.id === tabInfo.id && tab.url !== tabInfo.url
-      )
-    ) {
-      console.log("Visit: saving tab. tabInfo.url: ", tabInfo.url);
-      this.recordedTabs = this.recordedTabs.map((rtab) => {
-        if (rtab.id === tabInfo.id)
-          return { ...rtab, url: tabInfo.url }; // update the url
-        else return rtab;
-      });
-      this.sendTabInfo(tabInfo, "Navigate");
+  tabHistory: [],
+  addToHistory: function(tabId, url, windowId){
+    // when a new tab is created, the startpage url would be "chrome://newtab/",
+    // but once a user visits a url, the start page url changes at runtime to "chrome://new-tab-page/".
+    // We only store the new start page url in the 'history' because if we stored the old startpage url it won't ever match with the new startpage url.
+    if(!this.tabHistory.some(history => history.tabId === tabId)){
+      this.tabHistory.push({tabId, windowId, urls: [url], pos: 0});
+      console.log("New Tab added To History: ", JSON.stringify(this.tabHistory));
     }
+    else{
+      this.tabHistory = this.tabHistory.map(history => {
+        if(history.tabId === tabId){
+
+          // Discard urls after the curent pos on a new naviagtion
+          if(this.isNavigation){
+            const removedItems = history.urls.splice(history.pos + 1);
+            console.log("remvoedItems: ", removedItems);
+            this.isNavigation = false;
+          }
+
+          history.urls.push(url)
+          return {...history, urls: history.urls, pos: history.pos + 1};
+        }
+        else return history;
+      });
+      console.log("Updated History: ", JSON.stringify(this.tabHistory));
+    }
+  },
+  navigate: async function (tabInfo) {
+    if (!tabInfo.url || !isSupportedSite(tabInfo.url))
+      return;
+    this.isNavigation = true;
+    this.addToHistory(tabInfo.id, tabInfo.url);
+    this.sendTabInfo(tabInfo, "Navigate");
   },
   newWindow: function (tabInfo) {
     this.sendTabInfo(tabInfo, "NewWindow");
   },
   newTab: async function (tabInfo) {
-    if (!tabInfo?.url) return;
-
-    if (!isSupportedSite(tabInfo.url)) return;
-
-    if (
-      this.recordedTabs.length > 0 &&
-      !this.recordedTabs.some((t) => t.windowId === tabInfo.windowId)
-    ) {
-      this.recordedTabs.push({
-        id: tabInfo.id,
-        url: tabInfo.url,
-        windowId: tabInfo.windowId,
-      });
-      this.newWindow(tabInfo);
-      return;
-    }
-
-    if (this.recordedTabs.filter((tab) => tab.id === tabInfo.id).length === 0) {
-      console.log("NewTab: saving tab");
-      this.recordedTabs.push({
-        id: tabInfo.id,
-        url: tabInfo.url,
-        windowId: tabInfo.windowId,
-      });
-      this.sendTabInfo(tabInfo, "NewTab");
-    }
+    console.log("TabActions.newTab");
+    tabInfo.url = tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
+    this.addToHistory(tabInfo.id, tabInfo.url, tabInfo.windowId);
+    this.sendTabInfo(tabInfo, "NewTab");
   },
   selectWindow: function (tabInfo) {
     if (!this.activeWindowId) {
@@ -83,33 +78,81 @@ const TabActions = {
     }
   },
   selectTab: function (tabInfo) {
-    if (!tabInfo?.url) return;
+    let isNewWindow = false;
 
-    if (!isSupportedSite(tabInfo.url)) return;
+    if (this.tabHistory.length > 1 && !this.tabHistory.some(his => his.windowId === tabInfo.windowId)) {
+      console.log("selectTab -> NewWindow -> NewTab");
+      this.newWindow(tabInfo);
+      isNewWindow = true;
+    }
 
     // If the tab hasn't been saved, treat it as a 'NewTab' and return.
-    if (!this.recordedTabs.some((t) => t.id === tabInfo.id)) {
-      console.log("SelectTab: saving tab");
-      this.recordedTabs.push({
-        id: tabInfo.id,
-        url: tabInfo.url,
-        windowId: tabInfo.windowId,
-      });
-      this.sendTabInfo(tabInfo, "NewTab");
+    if (!this.tabHistory.some((history) => history.tabId === tabInfo.id)) {
+      console.log("selectTab -> NewTab");
+      tabInfo.url = tabInfo.url === "" || tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
+      this.tabHistory.push({tabId: tabInfo.id, windowId: tabInfo.windowId, urls: [tabInfo.url], pos: 0, fromSelect: true});
+
+      // Don't send the action if the its a new 'Window' as every new window comes with a new tab already created,
+      // So we don't need to explicitly create an action for the new tab. Our goal is not to show every 
+      // action that takes place but to only show appropriate actions that can serve the actions that follows.
+      if(!isNewWindow){
+        this.sendTabInfo(tabInfo, "NewTab");
+      }
 
       return;
     }
 
+    tabInfo.url = tabInfo.url === "chrome://newtab/" ? "chrome://new-tab-page/" : tabInfo.url;
     this.sendTabInfo(tabInfo, "SelectTab");
   },
-  closeTab: function (tabId) {
-    if (this.recordedTabs.some((tab) => tab.id === tabId)) {
-      console.log("CloseTab: saving tab");
-      const { url, windowId } = this.recordedTabs.filter(
-        (t) => t.id === tabId
-      )[0];
-      this.sendTabInfo({ id: tabId, url, windowId }, "CloseTab");
-      this.recordedTabs = this.recordedTabs.filter((t) => t.id !== tabId);
+  closeTab: async function (tabId) {
+    try{
+      const { urls, windowId, pos } = this.tabHistory.filter(history => history.tabId === tabId)[0];
+      
+      if (this.tabHistory.some((history) => history.tabId === tabId)) {
+        this.tabHistory = this.tabHistory.filter((history) => history.tabId !== tabId);
+      }
+
+      this.sendTabInfo({ id: tabId, url: urls[pos], windowId }, "CloseTab");
+    }catch(err){
+      console.log(err);      
+    }
+  },
+  back: function(tabId, changed_url, history){
+    console.log("isBack");
+    this.sendTabInfo({tabId: history.tabId, url: history.urls[0], windowId: history.windowId}, "Back");
+    this.tabHistory = this.tabHistory.map( history => {
+      if(history.tabId === tabId)
+        return {...history, pos: history.pos - 1};
+      else return history;
+    });
+  },
+  forward: function(tabId, changed_url, history){
+    console.log("isForward");
+    this.sendTabInfo({tabId: history.tabId, url: history.urls[0], windowId: history.windowId}, "Forward");
+    this.tabHistory = this.tabHistory.map( history => {
+      if(history.tabId === tabId)
+        return {...history, pos: history.pos + 1};
+      else return history;
+    });
+  },
+  handleForwardBack: function(tabId, changed_url){
+    // STACKOVERFLOW DELETED SUBMISSION: https://stackoverflow.com/questions/25542015/in-chrome-extension-determine-if-the-user-clicked-the-browsers-back-or-forward/76397179#76397179
+    if (!changed_url || !isSupportedSite(changed_url) && changed_url !== "chrome://new-tab-page/")
+      return;
+
+    const history = this.tabHistory.filter(history => history.tabId === tabId)[0];
+
+    const isBack = history.urls[history.pos - 1] === changed_url;
+    if(isBack){
+      this.back(tabId, changed_url, history);
+      return;
+    }
+
+    const isForward = history.urls[history.pos + 1] === changed_url;
+    if(isForward){
+      this.forward(tabId, changed_url, history);
+      return;
     }
   },
   sendTabInfo: async function (tabInfo, tabAction) {
@@ -138,44 +181,80 @@ const TabActions = {
       }
     }
   },
+  hasWindow:  function(windowId){
+    return this.tabHistory.some((t) => t.windowId === windowId)
+  },
+  hasHistory: function(){
+    return this.tabHistory.length > 0
+  }
 };
 
 /* UTILITIES */
+chrome.webNavigation.onCommitted.addListener(async function(details) {
+  // console.log("webNavigation", details);
+  const tabId = details.tabId;
+  const url = details.url;
+  const TrType = details.transitionType === "typed" ? "typed" : null;
+  const Qual = details.transitionQualifiers.filter(q => q === "forward_back" || q === "from_address_bar")[0];
+  const CURR_TAB_INFO = await getTabFromId(tabId);
+  const startPageUrl = url === "chrome://new-tab-page/"
+
+  if (!CURR_TAB_INFO || !isSupportedSite(CURR_TAB_INFO.url) && !startPageUrl) return;
+
+  // New Window
+  if (TrType === "typed" && TabActions.hasHistory() && !TabActions.hasWindow(CURR_TAB_INFO.windowId)){
+    TabActions.newWindow(CURR_TAB_INFO);
+  }
+
+  // New Tab
+  if (TrType === "typed" && !TabActions.tabHistory.some((tab) => tab.tabId === CURR_TAB_INFO.id && !tab.formSelect)){
+    console.log('NewTab: ', CURR_TAB_INFO);
+    TabActions.newTab(CURR_TAB_INFO);
+    return;
+  }
+
+  // Navigate using Address Bar 
+  if(TrType === "typed" && Qual === "from_address_bar"){
+    console.log("User Navigating");
+    TabActions.navigate(CURR_TAB_INFO);
+    return;
+  }
+
+  // Navigate History 
+  if(TrType === "typed" && Qual === "forward_back" || startPageUrl){
+    TabActions.handleForwardBack(tabId, url);
+  }
+});
+
 function handleRuntimeMessages() {
   chrome.runtime.onMessage.addListener(function (
     request,
     _sender,
     sendResponse
   ) {
-    if (request.status === "launch-extension") {
-      console.log("launch-extension: called");
+    if (request.message === "launch-extension") {
       createPopupWindow();
     } else if (request.message === "minimize-window") {
-      console.log("minimize-window");
       (async function () {
         const popupDetails = await asyncStorageGet("popupDetails");
         chrome.windows.update(popupDetails.windowId, { state: "minimise" });
       })();
     } else if (request.message === "bg-recording-status") {
-
-    /**
+      /**
      * This message is Sent from the Extension Frontend's "RecordingButton" component.
      * This same message is also sent to the contentScript that is recording actions on the active tab.
      * We can do this from the contentscript itself but we kept it here to group and execute all 'TAB RELATED ACTIONS'
       from here.
     */
-      console.log("message from content script: 'bg-recording-status'");
       (async function () {
         const isRecording = await asyncStorageGet("recording");
         sendResponse({ recording: isRecording });
       })();
     } else if (request.message === "recording-started") {
-      console.log("message from content script: 'recording-started'");
       (async function () {
         await asyncStorageSet({ recording: true });
       })();
     } else if (request.message === "recording-stopped") {
-      console.log("message from content script: 'recording-stopped'");
       (async function () {
         await asyncStorageSet({ recording: false });
       })();
@@ -234,7 +313,7 @@ async function getActiveWindowTab() {
     populate: true,
     windowTypes: ["normal"],
   });
-  console.log("windows: ", windows);
+  // console.log("windows: ", windows);
   windows.forEach((window) => {
     if (window.focused)
       window.tabs.forEach((tab) => {
@@ -283,7 +362,7 @@ async function isScriptInjected(tabId) {
 
 async function injectContentScript(activeTabId) {
   const isInjected = await isScriptInjected(activeTabId);
-  console.log({ isInjected });
+  // console.log({ isInjected });
 
   if (!isInjected) {
     console.log("injecting script from background worker");
@@ -312,20 +391,22 @@ async function updateLastActiveTabInLocalStorageAndInject(tabInfo) {
 function enableActiveTabListeners() {
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
     const activeTab = await getTabFromId(activeInfo.tabId);
-
     const ACTIVE_URL = activeTab?.url ? activeTab.url : activeTab.pendingUrl;
-    if (!isSupportedSite(ACTIVE_URL)) return;
 
     TabActions.selectTab(activeTab);
-    await updateLastActiveTabInLocalStorageAndInject(activeTab);
+
+    if (isSupportedSite(ACTIVE_URL))
+      await updateLastActiveTabInLocalStorageAndInject(activeTab);
   });
 
   chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
     const ACTIVE_URL = tab?.url ? tab.url : tab.pendingUrl;
-    if (!isSupportedSite(ACTIVE_URL)) return;
 
-    TabActions.navigate(tab, []);
-    TabActions.newTab(tab);
+    // console.log("before ACTIVE_URL: ", ACTIVE_URL);
+    if (!isSupportedSite(ACTIVE_URL)) return;
+    // console.log("after ACTIVE_URL: ", ACTIVE_URL);
+
+    // TabActions.newTab(tab);
     await updateLastActiveTabInLocalStorageAndInject(tab);
   });
 
@@ -347,9 +428,9 @@ function enableActiveTabListeners() {
       windows.forEach((window) => {
         if (window.id == windowId)
           window.tabs.forEach(async (tab) => {
+            TabActions.selectWindow(tab);
             if (tab.active && tab.favIconUrl) {
               updateLastActiveTabInLocalStorageAndInject(tab);
-              TabActions.selectWindow(tab);
             }
           });
       });
@@ -357,9 +438,9 @@ function enableActiveTabListeners() {
     { windowTypes: ["normal"] }
   );
 
-  // chrome.tabs.onCreated.addListener( tab => {});
-  // chrome.windows.onRemoved.addListener(function(windowId) {});
-  // chrome.windows.onCreated.addListener( window => {});
+  chrome.windows.onRemoved.addListener(function(windowId) {
+
+  });
 }
 
 function isSupportedSite(url) {
@@ -367,6 +448,7 @@ function isSupportedSite(url) {
     "chrome-extension://",
     "chrome://extensions/",
     "chrome://",
+    "chrome://newtab/",
     "http://",
   ];
 
@@ -375,17 +457,6 @@ function isSupportedSite(url) {
   }
 
   return true;
-}
-
-function isTargetUrl(url) {
-  let targetTag = url.split("").splice(getChar(url, "i", 2) + 2);
-  return targetTag
-    .join("")
-    .split("")
-    .splice(0, getChar(targetTag.join(""), "&", 1))
-    .join("") === "digital-text"
-    ? true
-    : false;
 }
 
 function getChar(str, char, n) {

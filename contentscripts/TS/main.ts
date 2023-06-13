@@ -11,10 +11,11 @@ console.log("///////////// action-recorder.js /////////////");
 //     : false;
 
 (async () => {
+  await triggerExtensionPopup();
   const isContentScriptRecording = await messageBackground({ messagee: 'bg-recording-status' });
   console.log({ isContentScriptRecording });
   let recObj = new ActionsRecorder();
-  recObj.recordList(windowRecorderHandler);
+  recObj.recordListeners(windowRecorderHandler);
   recObj.attachUnloadListener(BeforeWindowUnloadHandler);
   if (isContentScriptRecording && isContentScriptRecording !== "no-response")
     recObj.activate();
@@ -70,6 +71,9 @@ console.log("///////////// action-recorder.js /////////////");
     //   actionflowEl.setAttribute("actionflow-reloading", "true");
     // e.preventDefault();
     // return (event.returnValue = "");
+  }
+  async function triggerExtensionPopup() {
+    await messageBackground({message: 'launch-extension'});
   }
 })()
 
