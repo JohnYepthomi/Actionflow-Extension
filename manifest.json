@@ -40,7 +40,7 @@
       "js": ["./contentscripts/firstContent.js"]
     }
   ],
-  "host_permissions": ["https://*/*"],
+  "host_permissions": ["https://*/*", "http://*/*"],
   "icons": {
     "48": "/icons/48.png",
     "128": "/icons/128.png"
@@ -50,7 +50,7 @@
       "resources": [
         "contentscripts/action-recorder.js"
       ],
-      "matches": ["https://*/*"]
+      "matches": ["https://*/*", "http://*/*"]
     }
   ],
   "options_page": "popup.html"

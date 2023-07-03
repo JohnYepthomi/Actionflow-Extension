@@ -22,9 +22,11 @@ const chromeListener = async function (
 
   else if (request.message === "start-recording") {
     (this as ActionsRecorder).activate();
+    await messageBackground({message: "recording-started"});
   }
   else if (request.message === "stop-recording") {
     (this as ActionsRecorder).deActivate();
+    await messageBackground({ message: "recording-stopped" });
   }
   /**
    * This message was previously used by the 'getRecordingStatus' in the 
@@ -38,7 +40,7 @@ const chromeListener = async function (
   //   };
   //   await sendRuntimeMessage(currentRecordingStatus);
   // }
-  else if (request.status === "compose-completed") {
+  else if (request.message === "compose-completed") {
     console.log("compose-completed chrome runtime called on firstContent script");
     localStorage.setItem("isComposeCompleted", "true");
     //  Save "composeData" payload send from the EXTENSION's FRONTEND to localstorage so that when as user is composing workflow,

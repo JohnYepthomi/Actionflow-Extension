@@ -9,9 +9,6 @@ class ShortestSelector {
             element.nodeName === "#document" ||
             element.nodeName === "html")
             return;
-        if (element instanceof SVGElement) {
-            return this.getSelector(element.closest("svg").parentNode, null);
-        }
         if (element.nodeName.toLowerCase() === "body") {
             this.clearTargetNode();
             if (carriedSelector)
@@ -192,7 +189,7 @@ class ActionsRecorder {
             console.log(`%c Could not generate Selector for Element: ${el}`, "color: yellow; font-size: 0.85rem;");
             return;
         }
-        if (cssSelector) {
+        if (cssSelector && this.isInteractionElement(el, cssSelector)) {
             let commonProps = {
                 nodeName: el.nodeName,
                 selector: cssSelector,
@@ -200,7 +197,7 @@ class ActionsRecorder {
             let clickProps = {
                 "Wait For New Page To load": false,
                 "Wait For File Download": false,
-                Description: this.isInteractionElement(el, cssSelector) ? getActionDescription(el) : "",
+                Description: getActionDescription(el),
             };
             let action = {
                 actionType: "Click",

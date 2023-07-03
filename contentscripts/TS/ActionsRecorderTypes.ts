@@ -1,6 +1,5 @@
 type ChromeExtensionMessage = {
-  message?: "start-recording" | "stop-recording" | "get-recording-status";
-  status?: "compose-completed";
+  message?: "start-recording" | "stop-recording" | "get-recording-status" | "compose-completed";
   payload?: Action | string | boolean;
 };
 

@@ -64,8 +64,6 @@ class ActionsRecorder {
       * we will loose recording status when navigating to another url.
       * So, we store the status in the backgroundscript which is the only Source of truth.
       * */
-      await messageBackground({message: "recording-started"});
-
       console.log("Recorder Activated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -86,8 +84,6 @@ class ActionsRecorder {
       * we will loose recording status when navigating to another url.
       * So, we store the status in the backgroundscript which is the only Source of truth.
       * */
-      await messageBackground({ message: "recording-stopped" });
-
       console.log("Recorder Deactivated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -125,7 +121,7 @@ class ActionsRecorder {
 
       return;
     }
-    if (cssSelector && this.isInteractionElement(el, cssSelector)) {
+    if (cssSelector) {
       let commonProps: CommonProp = {
         nodeName: el.nodeName,
         selector: cssSelector,
@@ -133,7 +129,7 @@ class ActionsRecorder {
       let clickProps: ClickProp = {
         "Wait For New Page To load": false,
         "Wait For File Download": false,
-        Description: getActionDescription(el),
+        Description: this.isInteractionElement(el, cssSelector) ? getActionDescription(el) : "",
       };
       let action: Action = {
         actionType: "Click",

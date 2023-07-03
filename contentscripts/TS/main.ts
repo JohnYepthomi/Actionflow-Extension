@@ -4,15 +4,9 @@
 
 console.log("///////////// action-recorder.js /////////////");
 
-// Get the Prev State before calling 'actionsRecorder.record()'
-// const isContentScriptRecording =
-//   localStorage.getItem("isContentScriptRecording") !== "undefined"
-//     ? JSON.parse(localStorage.getItem("isContentscriptRecording"))
-//     : false;
-
 (async () => {
-  await triggerExtensionPopup();
-  const isContentScriptRecording = await messageBackground({ messagee: 'bg-recording-status' });
+  await messageBackground({message: 'launch-extension'});
+  const isContentScriptRecording = await messageBackground({ message: 'bg-recording-status' });
   console.log({ isContentScriptRecording });
   let recObj = new ActionsRecorder();
   recObj.recordListeners(windowRecorderHandler);
@@ -71,9 +65,6 @@ console.log("///////////// action-recorder.js /////////////");
     //   actionflowEl.setAttribute("actionflow-reloading", "true");
     // e.preventDefault();
     // return (event.returnValue = "");
-  }
-  async function triggerExtensionPopup() {
-    await messageBackground({message: 'launch-extension'});
   }
 })()
 

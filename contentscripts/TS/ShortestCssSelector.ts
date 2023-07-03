@@ -5,8 +5,8 @@ class ShortestSelector {
   TARGET_NODE: HTMLElement | undefined;
 
   getSelector(
-    element: HTMLElement | undefined,
-    carriedSelector: string | undefined
+    element: HTMLElement | null,
+    carriedSelector: string | null
   ): string | undefined {
     if (
       !element ||
@@ -14,6 +14,11 @@ class ShortestSelector {
       element.nodeName === "html"
     )
       return;
+
+    // Check if the current element is an SVG element
+    if (element instanceof SVGElement) {
+      return this.getSelector(element.closest("svg").parentNode as HTMLElement, null);
+    }
 
     if (element.nodeName.toLowerCase() === "body") {
       this.clearTargetNode();
