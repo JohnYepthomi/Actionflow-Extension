@@ -127,9 +127,6 @@ class ActionsRecorder {
         this.INTERVAL_WAIT = 10000;
         this.SUPPORTED_EVENTS = [
             "mouseup",
-            "keydown",
-            "scroll",
-            "mousemove",
             "input",
         ];
         this.startTime = Date.now();
@@ -173,46 +170,76 @@ class ActionsRecorder {
         }
     }
     async clickHandler(e) {
-        if (!e.target)
-            return;
         let el = e.target;
-        if ((el.nodeName !== "#document" && el.nodeName === "BUTTON") ||
-            el?.getAttribute("type") == "button") {
-            console.log("User clicked a Button: ", el.innerText);
-        }
-        else if (el.nodeName === "A") {
-            console.log("User clicked a Link: ", el.href);
-        }
-        else if (el.nodeName === "INPUT") {
-            console.log("User clicked an Input box: ", el.value);
-        }
+        if (!el || el.nodeName === "#document")
+            return;
+        let NODE_TYPE = this.getNodeType(el);
         const shortCssSelector = new ShortestSelector();
         const cssSelector = shortCssSelector.getSelector(el, undefined);
         if (!cssSelector) {
             console.log(`%c Could not generate Selector for Element: ${el}`, "color: yellow; font-size: 0.85rem;");
             return;
         }
-        if (cssSelector) {
-            let commonProps = {
-                nodeName: el.nodeName,
-                selector: cssSelector,
-            };
-            let clickProps = {
-                "Wait For New Page To load": false,
-                "Wait For File Download": false,
-                Description: this.isInteractionElement(el, cssSelector) ? getActionDescription(el) : "",
-            };
-            let action = {
-                actionType: "Click",
-                props: { ...commonProps, ...clickProps },
-            };
-            console.log(action);
-            let contentScriptMessage = {
-                status: "new-recorded-action",
-                actionType: "Click",
-                payload: action,
-            };
-            await sendRuntimeMessage(contentScriptMessage);
+        const commonProps = {
+            nodeName: el.nodeName,
+            selector: cssSelector,
+        };
+        switch (NODE_TYPE) {
+            case "Select":
+                const select_el = e.target;
+                const selectedValue = select_el.value;
+                const availableOptions = Array.from(select_el.options).map(op_el => op_el.textContent);
+                const selectProps = {
+                    Selected: selectedValue,
+                    Options: availableOptions,
+                    Description: this.isInteractionElement(select_el, cssSelector) ? getActionDescription(select_el) : "",
+                };
+                const selectAction = {
+                    actionType: "Select",
+                    props: { ...commonProps, ...selectProps },
+                };
+                const selectmsg = {
+                    status: "new-recorded-action",
+                    actionType: "Select",
+                    payload: selectAction,
+                };
+                await sendRuntimeMessage(selectmsg);
+                break;
+            default:
+                const clickProps = {
+                    "Wait For New Page To load": false,
+                    "Wait For File Download": false,
+                    Description: this.isInteractionElement(el, cssSelector) ? getActionDescription(el) : "",
+                };
+                const clickAction = {
+                    actionType: "Click",
+                    props: { ...commonProps, ...clickProps },
+                };
+                const clickmsg = {
+                    status: "new-recorded-action",
+                    actionType: "Click",
+                    payload: clickAction,
+                };
+                await sendRuntimeMessage(clickmsg);
+                break;
+        }
+    }
+    getNodeType(el) {
+        if (el.nodeName === "BUTTON" || el?.getAttribute("type") == "button") {
+            console.log("User clicked a Button: ", el.innerText);
+            return 'Button';
+        }
+        else if (el.nodeName === "A" || el?.getAttribute("type") == "link") {
+            console.log("User clicked a Link: ", el.href);
+            return 'Link';
+        }
+        else if (el.nodeName === "INPUT" || el?.getAttribute("type") == "input") {
+            console.log("User clicked an Input box: ", el.value);
+            return 'Input';
+        }
+        else if (el.nodeName === 'SELECT' || el?.getAttribute("type") == "select") {
+            console.log("User clicked on Select Node. Selected Option: ", el.value);
+            return 'Select';
         }
     }
     isInteractionElement(element, cssSelector) {
@@ -233,7 +260,39 @@ class ActionsRecorder {
             return true;
         return false;
     }
-    textInputHandler() { }
+    async textInputHandler(e) {
+        console.log("In textInputHandler");
+        let el = e.target;
+        const IGNORE_INPUTS = ["checkbox", "radio"];
+        const el_type_attr = el.getAttribute("type");
+        if (!["INPUT", "TEXTAREA"].includes(el.nodeName) || IGNORE_INPUTS.includes(el_type_attr))
+            return;
+        const shortCssSelector = new ShortestSelector();
+        const cssSelector = shortCssSelector.getSelector(el, undefined);
+        if (!cssSelector) {
+            console.log(`%c Could not generate Selector for Element: ${el}`, "color: yellow; font-size: 0.85rem;");
+            return;
+        }
+        const typedText = el?.value;
+        const commonProps = {
+            nodeName: el.nodeName,
+            selector: cssSelector,
+        };
+        const typeProps = {
+            Text: typedText,
+            "Overwrite Existing Text": false,
+        };
+        const typeAction = {
+            actionType: "Type",
+            props: { ...commonProps, ...typeProps },
+        };
+        const msg = {
+            status: "new-recorded-action",
+            actionType: "Type",
+            payload: typeAction,
+        };
+        await sendRuntimeMessage(msg);
+    }
     mouseMoveHandler() { }
     scrollHandler() { }
     attachUnloadListener(BeforeWindowUnloadHandler) {
@@ -334,10 +393,14 @@ console.log("///////////// action-recorder.js /////////////");
         switch (e.type) {
             case "input":
                 console.log("%c User input action recorded", "color: teal; font-style=italic;");
+                await recObj.textInputHandler(e);
                 break;
             case "mouseup":
                 console.log("%c mouseup action recorded", "color: green; font-style=italic;");
                 await recObj.clickHandler(e);
+                break;
+            default:
+                console.log("action-recorder default event type: ", e.type);
                 break;
         }
     }

@@ -4,24 +4,30 @@ const TabActions = {
   activeWindowId: null,
   recordedTabs: [],
   tabHistory: [],
-  onPopupInit: async function (){
+  onPopupInit: async function () {
     const isReady = await isPopupReady();
-    if(isReady){
+    if (isReady) {
       const currentActiveTab = await asyncStorageGet("lastActiveTabData");
-      this.newTab({id: currentActiveTab.tabId, url: currentActiveTab.url, windowId: currentActiveTab.windowId });
+      this.newTab({
+        id: currentActiveTab.tabId,
+        url: currentActiveTab.url,
+        windowId: currentActiveTab.windowId,
+      });
     }
   },
   addToHistory: async function (tabId, url, windowId) {
     const isExtensionUI = await isFrontend(tabId);
-    if(isExtensionUI)
-      return;
+    if (isExtensionUI) return;
 
     // when a new tab is created, the startpage url would be "chrome://newtab/",
     // but once a user visits a url, the start page url changes at runtime to "chrome://new-tab-page/".
     // We only store the new start page url in the 'history' because if we stored the old startpage url it won't ever match with the new startpage url.
     if (!this.hasTab(tabId)) {
       this.tabHistory.push({ tabId, windowId, urls: [url], pos: 0 });
-      logger.debug("New Tab added To History: ", JSON.stringify(this.tabHistory));
+      logger.debug(
+        "New Tab added To History: ",
+        JSON.stringify(this.tabHistory)
+      );
     } else {
       this.tabHistory = this.tabHistory.map((history) => {
         if (history.tabId === tabId && history.urls[history.pos] !== url) {
@@ -121,10 +127,14 @@ const TabActions = {
   },
   closeTab: async function (tabId, removeInfo) {
     try {
-      const { urls, windowId, pos } = this.tabHistory.filter((history) => history.tabId === tabId)[0];
+      const { urls, windowId, pos } = this.tabHistory.filter(
+        (history) => history.tabId === tabId
+      )[0];
 
       if (this.hasTab(tabId)) {
-        this.tabHistory = this.tabHistory.filter((history) => history.tabId !== tabId);
+        this.tabHistory = this.tabHistory.filter(
+          (history) => history.tabId !== tabId
+        );
       }
 
       const windowTabs = await tabsFromWindow(removeInfo.windowId);
@@ -140,12 +150,22 @@ const TabActions = {
       logger.error(err);
     }
   },
-  closeWindow: function (windowId){
-    this.sendTabInfo({ id: null, url: "dummy url", windowId: windowId }, "CloseWindow");
+  closeWindow: function (windowId) {
+    this.sendTabInfo(
+      { id: null, url: "dummy url", windowId: windowId },
+      "CloseWindow"
+    );
   },
   back: function (tabId, changed_url, history) {
     logger.debug("isBack");
-    this.sendTabInfo({ tabId: history.tabId, url: history.urls[0], windowId: history.windowId }, "Back");
+    this.sendTabInfo(
+      {
+        tabId: history.tabId,
+        url: history.urls[0],
+        windowId: history.windowId,
+      },
+      "Back"
+    );
     this.tabHistory = this.tabHistory.map((history) => {
       if (history.tabId === tabId) return { ...history, pos: history.pos - 1 };
       else return history;
@@ -153,7 +173,14 @@ const TabActions = {
   },
   forward: function (tabId, changed_url, history) {
     logger.debug("isForward");
-    this.sendTabInfo({ tabId: history.tabId, url: history.urls[0], windowId: history.windowId }, "Forward");
+    this.sendTabInfo(
+      {
+        tabId: history.tabId,
+        url: history.urls[0],
+        windowId: history.windowId,
+      },
+      "Forward"
+    );
     this.tabHistory = this.tabHistory.map((history) => {
       if (history.tabId === tabId) return { ...history, pos: history.pos + 1 };
       else return history;
@@ -161,10 +188,16 @@ const TabActions = {
   },
   handleForwardBack: function (tabId, changed_url) {
     // STACKOVERFLOW DELETED SUBMISSION: https://stackoverflow.com/questions/25542015/in-chrome-extension-determine-if-the-user-clicked-the-browsers-back-or-forward/76397179#76397179
-    if (!changed_url || (!isSupportedSite(changed_url) && changed_url !== "chrome://new-tab-page/"))
+    if (
+      !changed_url ||
+      (!isSupportedSite(changed_url) &&
+        changed_url !== "chrome://new-tab-page/")
+    )
       return;
 
-    const historyTab = this.tabHistory.filter((hist) => hist.tabId === tabId)[0];
+    const historyTab = this.tabHistory.filter(
+      (hist) => hist.tabId === tabId
+    )[0];
 
     const isBack = historyTab.urls[historyTab.pos - 1] === changed_url;
     if (isBack) {
@@ -184,13 +217,12 @@ const TabActions = {
   hasHistory: function () {
     return this.tabHistory.length > 0;
   },
-  hasTab: function (tabId){
+  hasTab: function (tabId) {
     return this.tabHistory.some((t) => t.tabId === tabId);
   },
   sendTabInfo: async function (tabInfo, tabAction) {
     const isReady = await isPopupReady();
-    if (!isReady || !tabInfo.url)
-      return;
+    if (!isReady || !tabInfo.url) return;
 
     const popupDetails = await asyncStorageGet("popupDetails");
     const EXT_TAB_ID = popupDetails.tabId;
@@ -218,56 +250,66 @@ const TabActions = {
 const logger = {
   disable: true,
   debug: (message, value, color) => {
-    if(message && !this.disable)
-      console.log(`%c ${message}`, `color: ${color ? color : 'orange'}; font-style: italic;`);
-    if(value)
-      console.log(value)
+    if (message && !this.disable)
+      console.log(
+        `%c ${message}`,
+        `color: ${color ? color : "orange"}; font-style: italic;`
+      );
+    if (value) console.log(value);
   },
   error: (error) => {
-    if(error && !this.disable)
-      console.log(`%c ${error}`, 'color: white; background-color: red;');
+    if (error && !this.disable)
+      console.log(`%c ${error}`, "color: white; background-color: red;");
   },
 };
 const RuntimeMessages = {
-  "launch-extension": function(sendResponse) {
+  "launch-extension": function (sendResponse) {
     createPopupWindow();
-    sendResponse({message: "launch-extension success"});
+    sendResponse({ message: "launch-extension success" });
   },
-  "minimize-window": function(sendResponse){
+  "minimize-window": function (sendResponse) {
     (async function () {
       const popupDetails = await asyncStorageGet("popupDetails");
       chrome.windows.update(popupDetails.windowId, { state: "minimise" });
       sendResponse({ message: "minimized-window success" });
     })();
   },
-  "bg-recording-status":function(sendResponse){
+  "bg-recording-status": function (sendResponse) {
     (async function () {
       const isRecording = await asyncStorageGet("recording");
       sendResponse({ recording: isRecording });
     })();
   },
-  "recording-started":function(sendResponse){
+  "recording-started": function (sendResponse) {
     (async function () {
       await asyncStorageSet({ recording: true });
       TabActions.onPopupInit();
       sendResponse({ message: "recording-started success" });
     })();
   },
-  "recording-stopped":function(sendResponse){
+  "recording-stopped": function (sendResponse) {
     (async function () {
       await asyncStorageSet({ recording: false });
       sendResponse({ message: "recording-stopped success" });
     })();
   },
-  "spa-pushstate": async function(sendResponse, request){
+  "spa-pushstate": async function (sendResponse, request) {
     let activeTabData = await asyncStorageGet("lastActiveTabData");
-    TabActions.addToHistory(activeTabData.tabId, request.url, activeTabData.windowId);
+    TabActions.addToHistory(
+      activeTabData.tabId,
+      request.url,
+      activeTabData.windowId
+    );
     TabActions.handleForwardBack(activeTabData.tabId, request.url);
     sendResponse({ message: "dummy-response" });
   },
-  "spa-popstate": async function(sendResponse, request){
+  "spa-popstate": async function (sendResponse, request) {
     let activeTabData = await asyncStorageGet("lastActiveTabData");
-    TabActions.addToHistory(activeTabData.tabId, request.url, activeTabData.windowId);
+    TabActions.addToHistory(
+      activeTabData.tabId,
+      request.url,
+      activeTabData.windowId
+    );
     TabActions.handleForwardBack(activeTabData.tabId, request.url);
     sendResponse({ message: "dummy-response" });
   },
@@ -284,8 +326,12 @@ try {
   chrome.webNavigation.onCommitted.addListener(async function (details) {
     await handleWebNavigation(details);
   });
-  chrome.runtime.onMessage.addListener(function (request, _sender, sendResponse) {
-    if(Object.keys(RuntimeMessages).includes(request.message)){
+  chrome.runtime.onMessage.addListener(function (
+    request,
+    _sender,
+    sendResponse
+  ) {
+    if (Object.keys(RuntimeMessages).includes(request.message)) {
       RuntimeMessages[request.message](sendResponse, request);
     }
     return true;
@@ -294,21 +340,25 @@ try {
   console.error(e);
 }
 
-// ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: TEST SPA HISTORY :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: SPA HISTORY :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 let prevHistoryDetailsTimeStamp = null;
 async function trackURLChanges(details) {
-  console.log("trackURLChanges details: ", details)
+  console.log("trackURLChanges details: ", details);
 
   // ignore swift changes in url : Only tested on twitter.com SPA Navigation
   let time_Diff = 0;
-  if(prevHistoryDetailsTimeStamp){
+  if (prevHistoryDetailsTimeStamp) {
     time_Diff = details.timeStamp - prevHistoryDetailsTimeStamp;
   }
   prevHistoryDetailsTimeStamp = details.timeStamp;
 
-  if (time_Diff > 1000 && details.frameId === 0 && details.transitionQualifiers.length === 0) {
+  if (
+    time_Diff > 1000 &&
+    details.frameId === 0 &&
+    details.transitionQualifiers.length === 0
+  ) {
     var currentURL = details.url;
-    console.log('onHistoryStateUpdated: SPA PAGE -> URL Changed:', currentURL);
+    console.log("onHistoryStateUpdated: SPA PAGE -> URL Changed:", currentURL);
     let tabDetails = await getTabFromId(details.tabId);
     TabActions.addToHistory(details.tabId, details.url, tabDetails.windowId);
   }
@@ -323,45 +373,51 @@ async function trackURLChanges(details) {
     TabActions.handleForwardBack(details.tabId, NavigatingUrl);
   }
 }
-
 chrome.webNavigation.onHistoryStateUpdated.addListener(trackURLChanges);
-
 // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::  END SPA HISTORY :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
-
-async function handleWebNavigation(details){
+async function handleWebNavigation(details) {
   console.log("webNavigation: ", details);
   const isReady = await isPopupReady();
-  if(!isReady)
-    return;
+  if (!isReady) return;
 
-  const NavTabId = details.tabId; 
+  const NavTabId = details.tabId;
   const NavigatingUrl = details.url;
   const StartPage = NavigatingUrl === "chrome://new-tab-page/";
   const NavigatingTab = await getTabFromId(NavTabId);
   const ActiveTab = await asyncStorageGet("lastActiveTabData");
   const isActiveTab = ActiveTab.tabId === NavTabId ? true : false;
 
-  if(!isActiveTab)
-    return;
+  if (!isActiveTab) return;
 
   if (!NavigatingTab || (!isSupportedSite(NavigatingTab.url) && !StartPage))
     return;
 
-  if(details.frameType === 'outermost_frame' && details.transitionType === 'link' && details.transitionQualifiers.length === 0){
+  if (
+    details.frameType === "outermost_frame" &&
+    details.transitionType === "link" &&
+    details.transitionQualifiers.length === 0
+  ) {
     console.log("WebNavigation: LINK -> NAVIGATE");
     TabActions.navigate(NavigatingTab);
   }
 
   // New Window
-  if (details.transitionType === "typed" && TabActions.hasHistory() && !TabActions.hasWindow(NavigatingTab.windowId)) {
+  if (
+    details.transitionType === "typed" &&
+    TabActions.hasHistory() &&
+    !TabActions.hasWindow(NavigatingTab.windowId)
+  ) {
     console.log("WebNavigation: NEW_WINDOW");
     TabActions.newWindow(NavigatingTab);
   }
 
   // New Tab
-  if (details.transitionType === "typed" && !TabActions.hasTab(NavigatingTab.id)) { // && !tab.formSelect
+  if (
+    details.transitionType === "typed" &&
+    !TabActions.hasTab(NavigatingTab.id)
+  ) {
+    // && !tab.formSelect
     console.log("WebNavigation: NEW_TAB");
     TabActions.newTab(NavigatingTab);
     return;
@@ -369,7 +425,12 @@ async function handleWebNavigation(details){
 
   // Navigate using Address Bar
   // in WebDriver chrome client, we get "server_redirect" transitionQualifiers as well
-  const from_address_bar_or_server_redirect = ["typed", "generated"].includes(details.transitionType) && details.transitionQualifiers.includes("from_address_bar") && !details.transitionQualifiers.includes("forward_back") || details.transitionQualifiers.includes("server_redirect") && !details.transitionQualifiers.includes("forward_back");
+  const from_address_bar_or_server_redirect =
+    (["typed", "generated"].includes(details.transitionType) &&
+      details.transitionQualifiers.includes("from_address_bar") &&
+      !details.transitionQualifiers.includes("forward_back")) ||
+    (details.transitionQualifiers.includes("server_redirect") &&
+      !details.transitionQualifiers.includes("forward_back"));
   if (from_address_bar_or_server_redirect) {
     console.log("WebNavigation: NAVIGATE");
     TabActions.navigate(NavigatingTab);
@@ -385,14 +446,12 @@ async function handleWebNavigation(details){
   }
 }
 
-async function isPopupReady(){
-  const popup = await asyncStorageGet("popupDetails")
+async function isPopupReady() {
+  const popup = await asyncStorageGet("popupDetails");
   const popupTab = await getTabFromId(popup.tabId);
   const isRecording = await asyncStorageGet("recording");
-  if(popupTab && isRecording)
-    return true
-  else
-    return false;
+  if (popupTab && isRecording) return true;
+  else return false;
 }
 
 function handlePopupActionWindow() {
@@ -414,8 +473,12 @@ async function createPopupWindow() {
             width: 400,
           },
           async function (window) {
-            await asyncStorageSet({ popupDetails: { tabId: window.tabs[0].id, windowId: window.id }});
-            setTimeout(() => { TabActions.onPopupInit(); } , 500);
+            await asyncStorageSet({
+              popupDetails: { tabId: window.tabs[0].id, windowId: window.id },
+            });
+            setTimeout(() => {
+              TabActions.onPopupInit();
+            }, 500);
           }
         );
       } else {
@@ -460,7 +523,7 @@ async function getTabFromId(tabId) {
 async function isScriptInjected(tabId) {
   try {
     let response = await chrome.scripting.executeScript({
-      target: { tabId: tabId },
+      target: { tabId },
       func: () => {
         try {
           return window.INJECTED === 1 ? true : false;
@@ -482,9 +545,9 @@ async function injectContentScript(activeTabId) {
 
   if (!isInjected) {
     logger.debug("injecting script from background worker");
-    try{
+    try {
       await injectScriptToActiveWindowTab(activeTabId);
-    }catch(error){
+    } catch (error) {
       console.warn(error);
     }
   }
@@ -494,15 +557,14 @@ async function messageTab(message, tabId) {
   await chrome.tabs.sendMessage(tabId, message);
 }
 
-async function isFrontend(tabId){
+async function isFrontend(tabId) {
   const popupTab = await asyncStorageGet("popupDetails");
-  return (popupTab?.tabId === tabId) ? true : false;
+  return popupTab?.tabId === tabId ? true : false;
 }
 
-async function UpdateActiveTab(tabInfo){
-  const isExtensionUI = await isFrontend(tabInfo.id)
-  if(isExtensionUI)
-    return;
+async function UpdateActiveTab(tabInfo) {
+  const isExtensionUI = await isFrontend(tabInfo.id);
+  if (isExtensionUI) return;
 
   await asyncStorageSet({
     lastActiveTabData: {
@@ -510,7 +572,7 @@ async function UpdateActiveTab(tabInfo){
       icon: tabInfo.favIconUrl,
       title: tabInfo.title,
       url: tabInfo.url,
-      windowId: tabInfo.windowId
+      windowId: tabInfo.windowId,
     },
   });
 }
@@ -521,19 +583,17 @@ function enableActiveTabListeners() {
     const ACTIVE_URL = activeTab?.url ? activeTab.url : activeTab.pendingUrl;
 
     await UpdateActiveTab(activeTab);
-    
-    const isReady = await isPopupReady();
-    if(isReady)
-      TabActions.selectTab(activeTab);
 
-    if (isSupportedSite(ACTIVE_URL))
-      await injectContentScript(activeTab.id);
+    const isReady = await isPopupReady();
+    if (isReady) TabActions.selectTab(activeTab);
+
+    if (isSupportedSite(ACTIVE_URL)) await injectContentScript(activeTab.id);
   });
 
   chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
     await UpdateActiveTab(tab);
     const ACTIVE_URL = tab?.url ? tab.url : tab.pendingUrl;
-    if (isSupportedSite(ACTIVE_URL)){
+    if (isSupportedSite(ACTIVE_URL)) {
       await injectContentScript(tab.id);
     }
   });
@@ -563,9 +623,9 @@ function enableActiveTabListeners() {
   );
 }
 
-async function tabsFromWindow(windowId){
+async function tabsFromWindow(windowId) {
   return await new Promise((resolve) => {
-    chrome.tabs.query({ windowId }, function(tabs) {
+    chrome.tabs.query({ windowId }, function (tabs) {
       resolve(tabs);
     });
   });

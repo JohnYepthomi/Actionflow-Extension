@@ -26,17 +26,17 @@ console.log("///////////// action-recorder.js /////////////");
     recObj.endTime = Date.now() + recObj.INTERVAL_WAIT;
     switch (e.type) {
       case "input":
-        console.log(
-          "%c User input action recorded",
-          "color: teal; font-style=italic;"
-        );
+        console.log("%c User input action recorded", "color: teal; font-style=italic;");
+        await recObj.textInputHandler(e);
         break;
+      
       case "mouseup":
-        console.log(
-          "%c mouseup action recorded",
-          "color: green; font-style=italic;"
-        );
+        console.log("%c mouseup action recorded", "color: green; font-style=italic;");
         await recObj.clickHandler(e);
+        break;
+
+      default:
+        console.log("action-recorder default event type: ", e.type);
         break;
     }
   }

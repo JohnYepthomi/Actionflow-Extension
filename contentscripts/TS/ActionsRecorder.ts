@@ -14,9 +14,9 @@ class ActionsRecorder {
   INTERVAL_WAIT = 10000;
   SUPPORTED_EVENTS: SUPPORTED_DOM_EVENTS[] = [
     "mouseup",
-    "keydown",
-    "scroll",
-    "mousemove",
+    // "keydown",
+    // "scroll",
+    // "mousemove",
     "input",
   ];
   startTime: number = Date.now();
@@ -40,13 +40,10 @@ class ActionsRecorder {
     this.SUPPORTED_EVENTS = SUPPORTED_EVENTS;
   }
 
-  async recordListeners(windowRecorderHandler: (e: Event)=> void) {
+  async recordListeners(windowRecorderHandler: (e: Event) => void) {
     this.SUPPORTED_EVENTS.forEach(
       function (eventType: SUPPORTED_DOM_EVENTS) {
-        document.addEventListener(
-          eventType,
-          windowRecorderHandler
-        );
+        document.addEventListener(eventType, windowRecorderHandler);
       }.bind(this)
     );
   }
@@ -58,12 +55,12 @@ class ActionsRecorder {
       return;
     } else {
       this.isActive = true;
-      
-      /** 
-      * A Change in a the current tab's url would change the local storage and 
-      * we will loose recording status when navigating to another url.
-      * So, we store the status in the backgroundscript which is the only Source of truth.
-      * */
+
+      /**
+       * A Change in a the current tab's url would change the local storage and
+       * we will loose recording status when navigating to another url.
+       * So, we store the status in the backgroundscript which is the only Source of truth.
+       * */
       console.log("Recorder Activated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -79,11 +76,11 @@ class ActionsRecorder {
     } else {
       this.isActive = false;
 
-      /** 
-      * A Change in a the current tab's url would change the local storage and 
-      * we will loose recording status when navigating to another url.
-      * So, we store the status in the backgroundscript which is the only Source of truth.
-      * */
+      /**
+       * A Change in a the current tab's url would change the local storage and
+       * we will loose recording status when navigating to another url.
+       * So, we store the status in the backgroundscript which is the only Source of truth.
+       * */
       console.log("Recorder Deactivated");
       localStorage.setItem(
         "isContentScriptRecording",
@@ -93,23 +90,10 @@ class ActionsRecorder {
   }
 
   async clickHandler(e: Event) {
-    if (!e.target) return;
-
     let el = e.target as HTMLElement;
+    if (!el || el.nodeName === "#document") return;
 
-    if (
-      (el.nodeName !== "#document" && el.nodeName === "BUTTON") ||
-      el?.getAttribute("type") == "button"
-    ) {
-      console.log("User clicked a Button: ", el.innerText);
-    } else if (el.nodeName === "A") {
-      console.log("User clicked a Link: ", (el as HTMLLinkElement).href);
-    } else if (el.nodeName === "INPUT") {
-      console.log(
-        "User clicked an Input box: ",
-        (el as HTMLInputElement).value
-      );
-    }
+    let NODE_TYPE: string = this.getNodeType(el);
 
     const shortCssSelector = new ShortestSelector();
     const cssSelector = shortCssSelector.getSelector(el, undefined);
@@ -121,29 +105,81 @@ class ActionsRecorder {
 
       return;
     }
-    if (cssSelector) {
-      let commonProps: CommonProp = {
-        nodeName: el.nodeName,
-        selector: cssSelector,
-      };
-      let clickProps: ClickProp = {
-        "Wait For New Page To load": false,
-        "Wait For File Download": false,
-        Description: this.isInteractionElement(el, cssSelector) ? getActionDescription(el) : "",
-      };
-      let action: Action = {
-        actionType: "Click",
-        props: { ...commonProps, ...clickProps },
-      };
 
-      console.log(action);
-      // this.saveActionDetailsToStorage(action);
-      let contentScriptMessage: ContentScriptMessage = {
-        status: "new-recorded-action",
-        actionType: "Click",
-        payload: action,
-      };
-      await sendRuntimeMessage(contentScriptMessage);
+    const commonProps: CommonProp = {
+      nodeName: el.nodeName,
+      selector: cssSelector,
+    };
+
+    switch (NODE_TYPE) {
+      case "Select":
+        const select_el = e.target as HTMLSelectElement;
+        const selectedValue = select_el.value;
+        const availableOptions = Array.from(select_el.options).map(
+          (op_el) => op_el.textContent
+        );
+        const selectProps: SelectProp = {
+          Selected: selectedValue,
+          Options: availableOptions,
+          Description: this.isInteractionElement(select_el, cssSelector)
+            ? getActionDescription(select_el)
+            : "",
+        };
+        const selectAction: Action = {
+          actionType: "Select",
+          props: { ...commonProps, ...selectProps },
+        };
+        const selectmsg: ContentScriptMessage = {
+          status: "new-recorded-action",
+          actionType: "Select",
+          payload: selectAction,
+        };
+        await sendRuntimeMessage(selectmsg);
+        break;
+      default:
+        const clickProps: ClickProp = {
+          "Wait For New Page To load": false,
+          "Wait For File Download": false,
+          Description: this.isInteractionElement(el, cssSelector)
+            ? getActionDescription(el)
+            : "",
+        };
+        const clickAction: Action = {
+          actionType: "Click",
+          props: { ...commonProps, ...clickProps },
+        };
+        const clickmsg: ContentScriptMessage = {
+          status: "new-recorded-action",
+          actionType: "Click",
+          payload: clickAction,
+        };
+        await sendRuntimeMessage(clickmsg);
+        break;
+    }
+  }
+
+  getNodeType(el) {
+    if (el.nodeName === "BUTTON" || el?.getAttribute("type") == "button") {
+      console.log("User clicked a Button: ", el.innerText);
+      return "Button";
+    } else if (el.nodeName === "A" || el?.getAttribute("type") == "link") {
+      console.log("User clicked a Link: ", (el as HTMLLinkElement).href);
+      return "Link";
+    } else if (el.nodeName === "INPUT" || el?.getAttribute("type") == "input") {
+      console.log(
+        "User clicked an Input box: ",
+        (el as HTMLInputElement).value
+      );
+      return "Input";
+    } else if (
+      el.nodeName === "SELECT" ||
+      el?.getAttribute("type") == "select"
+    ) {
+      console.log(
+        "User clicked on Select Node. Selected Option: ",
+        (el as HTMLInputElement).value
+      );
+      return "Select";
     }
   }
 
@@ -172,7 +208,49 @@ class ActionsRecorder {
     return false;
   }
 
-  textInputHandler() {}
+  async textInputHandler(e: Event) {
+    console.log("In textInputHandler");
+
+    let el = e.target as HTMLInputElement;
+    const IGNORE_INPUTS = ["checkbox", "radio"];
+    const el_type_attr = el.getAttribute("type");
+    if (
+      !["INPUT", "TEXTAREA"].includes(el.nodeName) ||
+      IGNORE_INPUTS.includes(el_type_attr)
+    )
+      return;
+
+    const shortCssSelector = new ShortestSelector();
+    const cssSelector = shortCssSelector.getSelector(el, undefined);
+    if (!cssSelector) {
+      console.log(
+        `%c Could not generate Selector for Element: ${el}`,
+        "color: yellow; font-size: 0.85rem;"
+      );
+
+      return;
+    }
+
+    const typedText = el?.value;
+    const commonProps: CommonProp = {
+      nodeName: el.nodeName,
+      selector: cssSelector,
+    };
+    const typeProps: TypeProp = {
+      Text: typedText,
+      "Overwrite Existing Text": false,
+    };
+    const typeAction: Action = {
+      actionType: "Type",
+      props: { ...commonProps, ...typeProps },
+    };
+    const msg: ContentScriptMessage = {
+      status: "new-recorded-action",
+      actionType: "Type",
+      payload: typeAction,
+    };
+    await sendRuntimeMessage(msg);
+  }
 
   mouseMoveHandler() {}
 
@@ -195,6 +273,7 @@ class ActionsRecorder {
     if (!prevSerialized) {
       let newCompose = { [`${this.PAGE_URL}-node-0`]: newAction };
       localStorage.setItem("composeData", JSON.stringify(newCompose));
+
       return;
     }
 
