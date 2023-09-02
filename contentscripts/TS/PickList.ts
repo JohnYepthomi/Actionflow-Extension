@@ -1,10 +1,11 @@
-class FindColParent {
+class PickList {
   static siblings: Element[] | undefined;
   static hoverEl: Element;
   static finalCandidate: Element;
   // static prevCounterEls = [];
   // static scrollContainers: [];
   static isActive = false;
+  static actionId = undefined;
 
   static searchListStructure(candidate: HTMLElement | null) {
     if (!candidate) {
@@ -98,10 +99,10 @@ class FindColParent {
       mode: "open",
     });
     shadow.appendChild(overlayEl);
-    spanEl.addEventListener("click", () => {
-      console.log("overlayEl clicked!");
-      removeDocumentHoverListener();
-    });
+    // spanEl.addEventListener("click", () => {
+    //   console.log("overlayEl clicked!");
+    //   removeDocumentHoverListener();
+    // });
   }
 
   static removeAllOverlays() {
@@ -326,16 +327,16 @@ class ValidateListStructure {
 
 //   upEl?.addEventListener("click", () => {
 //     console.log(
-//       "up level called with FindColParent.finalCandidate: ",
-//       FindColParent.finalCandidate
+//       "up level called with PickList.finalCandidate: ",
+//       PickList.finalCandidate
 //     );
-//     if (FindColParent.finalCandidate) {
-//       FindColParent.find(FindColParent.finalCandidate.parentElement!);
+//     if (PickList.finalCandidate) {
+//       PickList.find(PickList.finalCandidate.parentElement!);
 //     }
 //   });
 //   downEl?.addEventListener("click", () => {
-//     if (FindColParent.finalCandidate)
-//       FindColParent.find(FindColParent.finalCandidate.firstElementChild!);
+//     if (PickList.finalCandidate)
+//       PickList.find(PickList.finalCandidate.firstElementChild!);
 //   });
 //   activateHover?.addEventListener("click", () => {
 //     document.removeEventListener("mousemove", handleDocumentHover);
@@ -464,8 +465,8 @@ function handleDocumentHover(e: any) {
     return;
   }
 
-  FindColParent.searchListStructure(e.target);
-  FindColParent.addListStructureOverlay();
+  PickList.searchListStructure(e.target);
+  PickList.addListStructureOverlay();
   prevHoverElement = e.target;
 }
 
@@ -495,7 +496,7 @@ function filterNode(node) {
 // }
 
 // function getColParentFromPoint(x, y) {
-//   const ColParent = FindColParent.finalCandidate;
+//   const ColParent = PickList.finalCandidate;
 //   if (ColParent) {
 //     const sibs = ColParent.parentElement?.children;
 //     let result: Element | null = null;
@@ -572,23 +573,47 @@ function filterNode(node) {
 function addListItemListeners() {
   console.log("adding scroll listener to window");
   window.addEventListener("scroll", (e) => {
-    if (FindColParent.isActive) {
-      FindColParent.addListStructureOverlay();
+    if (PickList.isActive) {
+      PickList.addListStructureOverlay();
     }
   });
   document.addEventListener(
     "click",
     (e) => {
-      if (FindColParent.isActive) {
+      if (PickList.isActive) {
         e.stopPropagation();
         e.preventDefault();
-        FindColParent.isActive = false;
-        FindColParent.removeAllOverlays();
-        removeDocumentHoverListener();
+        if (PickList.finalCandidate && PickList.actionId) {
+          sendRuntimeMessage({
+            status: "element-action-update",
+            payload: {
+              type: "UPDATE_INTERACTION",
+              props: {
+                nodeName: PickList.finalCandidate.nodeName,
+                selector: new ShortestSelector().getSelector(
+                  PickList.finalCandidate as HTMLElement,
+                  null
+                ),
+              },
+              actionId: PickList.actionId,
+            },
+          });
+        }
+
+        finishFindList();
       }
     },
     true
   );
+}
+
+function finishFindList() {
+  PickList.isActive = false;
+  PickList.actionId = undefined;
+  PickList.finalCandidate = undefined;
+  PickList.siblings = undefined;
+  PickList.removeAllOverlays();
+  removeDocumentHoverListener();
 }
 
 function changeCursorStyle(cursorType = "crosshair") {
@@ -607,10 +632,25 @@ function changeCursorStyle(cursorType = "crosshair") {
   }
 }
 
-FindColParent.addPageOverlay();
-FindColParent.isActive = true;
-changeCursorStyle();
-// addColListeners();
-// createHoverControlUI();
-addDocumentHoverListener();
-addListItemListeners();
+function handleEscapeKey(e) {
+  if (e.key === "Escape") {
+    finishFindList();
+    document.removeEventListener("keyup", handleEscapeKey);
+  }
+}
+
+function addEscapeKeyListener() {
+  document.addEventListener("keyup", handleEscapeKey);
+}
+
+function beginFindList(actionId: string) {
+  PickList.actionId = actionId;
+  PickList.addPageOverlay();
+  PickList.isActive = true;
+  changeCursorStyle();
+  // addColListeners();
+  // createHoverControlUI();
+  addDocumentHoverListener();
+  addListItemListeners();
+  addEscapeKeyListener();
+}

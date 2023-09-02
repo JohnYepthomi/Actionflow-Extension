@@ -22,6 +22,7 @@ class ActionsRecorder {
   startTime: number = Date.now();
   endTime: number = this.startTime + this.INITIAL_WAIT;
   isActive: Boolean = false;
+  tempInactive = false;
   PAGE_URL: string;
 
   constructor() {
@@ -129,10 +130,13 @@ class ActionsRecorder {
           actionType: "Select",
           props: { ...commonProps, ...selectProps },
         };
-        const selectmsg: ContentScriptMessage = {
+        const selectmsg: ToFrontendMessage = {
           status: "new-recorded-action",
-          actionType: "Select",
-          payload: selectAction,
+          payload: {
+            type: "RECORDED_ACTION",
+            actionType: "Select",
+            payload: selectAction,
+          },
         };
         await sendRuntimeMessage(selectmsg);
         break;
@@ -140,18 +144,19 @@ class ActionsRecorder {
         const clickProps: ClickProp = {
           "Wait For New Page To load": false,
           "Wait For File Download": false,
-          Description: this.isInteractionElement(el, cssSelector)
-            ? getActionDescription(el)
-            : "",
+          Description: getActionDescription(el).trim(),
         };
         const clickAction: Action = {
           actionType: "Click",
           props: { ...commonProps, ...clickProps },
         };
-        const clickmsg: ContentScriptMessage = {
+        const clickmsg: ToFrontendMessage = {
           status: "new-recorded-action",
-          actionType: "Click",
-          payload: clickAction,
+          payload: {
+            type: "RECORDED_ACTION",
+            actionType: "Click",
+            payload: clickAction,
+          },
         };
         await sendRuntimeMessage(clickmsg);
         break;
@@ -244,10 +249,13 @@ class ActionsRecorder {
       actionType: "Type",
       props: { ...commonProps, ...typeProps },
     };
-    const msg: ContentScriptMessage = {
+    const msg: ToFrontendMessage = {
       status: "new-recorded-action",
-      actionType: "Type",
-      payload: typeAction,
+      payload: {
+        type: "RECORDED_ACTION",
+        actionType: "Type",
+        payload: typeAction,
+      },
     };
     await sendRuntimeMessage(msg);
   }
@@ -292,16 +300,13 @@ function getActionDescription(element: HTMLElement): string {
     return "";
   }
 
-  let description = "";
-
-  if (element.textContent !== "" || element.textContent !== undefined)
-    description = element.textContent!;
-
   for (const attr of ["aria-label", "title", "placeholder"]) {
-    if (element.getAttribute(attr)) description = element.getAttribute(attr)!;
+    if (element.getAttribute(attr)) {
+      console.log("Action Description: ", element.getAttribute(attr));
+      return element.getAttribute(attr);
+    }
   }
 
-  console.log("Action Description: ", description);
-
-  return description;
+  if (element.textContent !== "" || element.textContent !== undefined)
+    return element.textContent!;
 }

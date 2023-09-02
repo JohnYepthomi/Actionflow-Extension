@@ -233,11 +233,14 @@ const TabActions = {
       await messageTab(
         {
           status: "new-recorded-action",
-          actionType: tabAction,
           payload: {
-            url: tabInfo.url,
-            tabId: tabInfo.id,
-            windowId: tabInfo.windowId,
+            type: "RECORDED_ACTION",
+            actionType: tabAction,
+            payload: {
+              url: tabInfo.url,
+              tabId: tabInfo.id,
+              windowId: tabInfo.windowId,
+            },
           },
         },
         EXT_TAB_ID
@@ -469,8 +472,8 @@ async function createPopupWindow() {
           {
             url: chrome.runtime.getURL("./dist/index.html"),
             type: "popup",
-            height: 500,
-            width: 400,
+            height: 700,
+            width: 450,
           },
           async function (window) {
             await asyncStorageSet({

@@ -5,8 +5,10 @@
 console.log("///////////// action-recorder.js /////////////");
 
 (async () => {
-  await messageBackground({message: 'launch-extension'});
-  const isContentScriptRecording = await messageBackground({ message: 'bg-recording-status' });
+  await messageBackground({ message: "launch-extension" });
+  const isContentScriptRecording = await messageBackground({
+    message: "bg-recording-status",
+  });
   console.log({ isContentScriptRecording });
   let recObj = new ActionsRecorder();
   recObj.recordListeners(windowRecorderHandler);
@@ -23,15 +25,28 @@ console.log("///////////// action-recorder.js /////////////");
     }
 
     if (!recObj.isActive) return;
+
+    // if Temporarily disabled recorder , enable it and return; 'ListAction' or 'ELementText' enables it.
+    if (recObj.tempInactive) {
+      recObj.tempInactive = false;
+      return;
+    }
+
     recObj.endTime = Date.now() + recObj.INTERVAL_WAIT;
     switch (e.type) {
       case "input":
-        console.log("%c User input action recorded", "color: teal; font-style=italic;");
+        console.log(
+          "%c User input action recorded",
+          "color: teal; font-style=italic;"
+        );
         await recObj.textInputHandler(e);
         break;
-      
+
       case "mouseup":
-        console.log("%c mouseup action recorded", "color: green; font-style=italic;");
+        console.log(
+          "%c mouseup action recorded",
+          "color: green; font-style=italic;"
+        );
         await recObj.clickHandler(e);
         break;
 
@@ -66,6 +81,4 @@ console.log("///////////// action-recorder.js /////////////");
     // e.preventDefault();
     // return (event.returnValue = "");
   }
-})()
-
-
+})();

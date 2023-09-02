@@ -1,22 +1,63 @@
-type ChromeExtensionMessage = {
-  message?:
-    | "start-recording"
-    | "stop-recording"
-    | "get-recording-status"
-    | "compose-completed"
-    | "pick-list-element";
-  payload?: Action | string | boolean;
+/* ------------------ MESSAGE FROM FRONTEND ---------------  */
+
+type FromFrontendMessage =
+  | StartRecordingMessage
+  | StopRecordingMessage
+  | ComposeCompletedMessage
+  | ElementActionStartMessage;
+
+type StartRecordingMessage = {
+  message: "start-recording";
+  payload: boolean;
+};
+type StopRecordingMessage = {
+  message: "stop-recording";
+  payload: boolean;
+};
+type ComposeCompletedMessage = {
+  message: "compose-completed";
+  payload: Action;
+};
+type ElementActionStartMessage = {
+  message: "element-pick";
+  payload: {
+    id: string;
+    actionType: "List" | "Text" | "Attribute" | "Anchor" | "Click" | "URL";
+    props: {
+      attribute?: string;
+    };
+  };
 };
 
-type ContentScriptMessage = {
-  status: "new-recorded-action" | "current-recording-status";
-  actionType: ActionEventTypes;
-  payload: Action | Boolean;
+/* ------------------ MESSAGE TO FRONTEND ---------------  */
+
+type ToFrontendMessage = ToRecordedActionMessage | ToElementActionUpdateMessage;
+type ToRecordedActionMessage = {
+  status: "new-recorded-action";
+  payload: {
+    type: "RECORDED_ACTION";
+    actionType: ActionEventTypes;
+    payload: Action;
+  };
 };
-/*-------------------------*/
+// This type is the same as TEvtWithProps type: "UPDATE_INTERACTION" 's variant used in FrontEnd.
+type ToElementActionUpdateMessage = {
+  status: "element-action-update";
+  payload: {
+    type: "UPDATE_INTERACTION";
+    props: {
+      nodeName: string;
+      selector: string;
+      value?: string;
+    };
+    actionId: string;
+  };
+};
+
+/* ------------------ PARTIAL ACTION TYPES ---------------  */
+
 type ActionEventTypes =
   | "Visit"
-  | "NewTab"
   | "Click"
   | "Scroll"
   | "Keypress"
@@ -24,19 +65,24 @@ type ActionEventTypes =
   | "Hover"
   | "Select"
   | "Date"
+  | "NewTab"
   | "Upload"
   | "Code"
-  | "Prompts";
+  | "Prompts"
+  | "List"
+  | "Text"
+  | "Attribute"
+  | "Link";
 
-/*------ COMMON PROPS -------*/
-
+/*--------------------- COMMON PROPS -------------------*/
+// Same type as TCommonProps used in FrontEnd.
 type CommonProp = {
   nodeName: string;
   selector: string;
 };
 
-/*------ ACTION PROPS ------*/
-
+/*/*---------------------- ACTION PROPS ----------------*/
+// Same/Partial Prop Types as used in FrontEnd
 type ClickProp = {
   "Wait For New Page To load": boolean;
   "Wait For File Download": boolean;
@@ -52,15 +98,25 @@ type TypeProp = {
   "Overwrite Existing Text": boolean;
 };
 
-/*-------------------------*/
+/*-------------------------------------------------------*/
+
+type ActionElementAttributeProp = CommonProp;
+type ActionElementTextProp = CommonProp;
+type ActionListProp = CommonProp;
 type ActionClickProp = CommonProp & ClickProp;
 type ActionSelectProp = CommonProp & SelectProp;
 type ActionTypeProp = CommonProp & TypeProp;
 
-type AllActionProps = ActionClickProp | ActionSelectProp | ActionTypeProp;
+type AllActionProps =
+  | ActionClickProp
+  | ActionSelectProp
+  | ActionTypeProp
+  | ActionElementAttributeProp
+  | ActionElementTextProp;
 
-/*-------------------------*/
+/*-------------------------------------------------------*/
 type Action = {
   actionType: ActionEventTypes;
   props: AllActionProps;
 };
+/* -------------------------- END ----------------------  */
