@@ -126,36 +126,34 @@ class ActionsRecorder {
             ? getActionDescription(select_el)
             : "",
         };
-        const selectAction: Action = {
-          actionType: "Select",
-          props: { ...commonProps, ...selectProps },
-        };
+        const selectActionProps: Action = { ...commonProps, ...selectProps };
         const selectmsg: ToFrontendMessage = {
           status: "new-recorded-action",
           payload: {
             type: "RECORDED_ACTION",
-            actionType: "Select",
-            payload: selectAction,
+            payload: {
+              actionType: "Select",
+              props: selectActionProps,
+            },
           },
         };
         await sendRuntimeMessage(selectmsg);
         break;
       default:
         const clickProps: ClickProp = {
-          "Wait For New Page To load": false,
+          "Wait For New Page To Load": false,
           "Wait For File Download": false,
           Description: getActionDescription(el).trim(),
         };
-        const clickAction: Action = {
-          actionType: "Click",
-          props: { ...commonProps, ...clickProps },
-        };
+        const clickAction: Action = { ...commonProps, ...clickProps };
         const clickmsg: ToFrontendMessage = {
           status: "new-recorded-action",
           payload: {
             type: "RECORDED_ACTION",
-            actionType: "Click",
-            payload: clickAction,
+            payload: {
+              actionType: "Click",
+              props: clickAction,
+            },
           },
         };
         await sendRuntimeMessage(clickmsg);
@@ -245,16 +243,15 @@ class ActionsRecorder {
       Text: typedText,
       "Overwrite Existing Text": false,
     };
-    const typeAction: Action = {
-      actionType: "Type",
-      props: { ...commonProps, ...typeProps },
-    };
+    const typeAction: Action = { ...commonProps, ...typeProps };
     const msg: ToFrontendMessage = {
       status: "new-recorded-action",
       payload: {
         type: "RECORDED_ACTION",
-        actionType: "Type",
-        payload: typeAction,
+        payload: {
+          actionType: "Type",
+          props: typeAction,
+        },
       },
     };
     await sendRuntimeMessage(msg);

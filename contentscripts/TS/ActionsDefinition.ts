@@ -1,22 +1,23 @@
-const ActionNodeProps = {
+/**
+ * @NOTE : The Definitions below should be the same as the Actionflow FrontEnd ActionDefinitions.
+ *  */
+
+export const ActionNodeProps = {
   Common: {
     nodeName: "",
     selector: "",
   },
   Type: {
     Text: "",
-    "Overwrite existing text": false,
+    "Overwrite Existing Text": false,
   },
   Click: {
-    "Wait For New Page To load": false,
+    "Wait For New Page To Load": false,
     "Wait For File Download": false,
     Description: "",
   },
   Scroll: {
-    "Scroll Direction": {
-      Top: false,
-      Bottom: false,
-    },
+    Direction: ["Top", "Bottom"],
     Description: "",
   },
   Hover: {
@@ -30,7 +31,8 @@ const ActionNodeProps = {
     "Response Text": "",
   },
   Select: {
-    Value: "",
+    Selected: "",
+    Options: [],
     Description: "",
   },
   Keypress: {
@@ -45,5 +47,30 @@ const ActionNodeProps = {
   },
   Code: {
     Code: "",
+  },
+  List: {
+    variable: "",
+  },
+  Text: {
+    variable: "",
+    value: "",
+  },
+  Attribute: {
+    variable: "",
+    attribute: "",
+    value: "",
+  },
+  Anchor: {
+    variable: "",
+    value: "",
+  },
+  URL: {
+    variable: "",
+    value: "",
+  },
+  Tab: {
+    url: "",
+    tabId: "",
+    windowId: "",
   },
 };

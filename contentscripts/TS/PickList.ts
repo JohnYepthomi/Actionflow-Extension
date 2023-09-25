@@ -588,14 +588,16 @@ function addListItemListeners() {
             status: "element-action-update",
             payload: {
               type: "UPDATE_INTERACTION",
-              props: {
-                nodeName: PickList.finalCandidate.nodeName,
-                selector: new ShortestSelector().getSelector(
-                  PickList.finalCandidate as HTMLElement,
-                  null
-                ),
-              },
-              actionId: PickList.actionId,
+              payload: {
+                actionId: PickList.actionId,
+                props: {
+                  nodeName: PickList.finalCandidate.nodeName,
+                  selector: new ShortestSelector().getSelector(
+                    PickList.finalCandidate as HTMLElement,
+                    null
+                  ),
+                },
+              }
             },
           });
         }

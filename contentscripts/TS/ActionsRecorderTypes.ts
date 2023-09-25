@@ -36,8 +36,10 @@ type ToRecordedActionMessage = {
   status: "new-recorded-action";
   payload: {
     type: "RECORDED_ACTION";
-    actionType: ActionEventTypes;
-    payload: Action;
+    payload: {
+      actionType: ActionEventTypes;
+      props: Action;
+    };
   };
 };
 // This type is the same as TEvtWithProps type: "UPDATE_INTERACTION" 's variant used in FrontEnd.
@@ -45,12 +47,14 @@ type ToElementActionUpdateMessage = {
   status: "element-action-update";
   payload: {
     type: "UPDATE_INTERACTION";
-    props: {
-      nodeName: string;
-      selector: string;
-      value?: string;
+    payload: {
+      actionId: string;
+      props: {
+        nodeName: string;
+        selector: string;
+        value?: string;
+      };
     };
-    actionId: string;
   };
 };
 
@@ -84,7 +88,7 @@ type CommonProp = {
 /*/*---------------------- ACTION PROPS ----------------*/
 // Same/Partial Prop Types as used in FrontEnd
 type ClickProp = {
-  "Wait For New Page To load": boolean;
+  "Wait For New Page To Load": boolean;
   "Wait For File Download": boolean;
   Description: string;
 };
@@ -115,8 +119,5 @@ type AllActionProps =
   | ActionElementTextProp;
 
 /*-------------------------------------------------------*/
-type Action = {
-  actionType: ActionEventTypes;
-  props: AllActionProps;
-};
+type Action = AllActionProps;
 /* -------------------------- END ----------------------  */

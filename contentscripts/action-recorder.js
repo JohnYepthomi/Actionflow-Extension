@@ -197,36 +197,34 @@ class ActionsRecorder {
                         ? getActionDescription(select_el)
                         : "",
                 };
-                const selectAction = {
-                    actionType: "Select",
-                    props: { ...commonProps, ...selectProps },
-                };
+                const selectActionProps = { ...commonProps, ...selectProps };
                 const selectmsg = {
                     status: "new-recorded-action",
                     payload: {
                         type: "RECORDED_ACTION",
-                        actionType: "Select",
-                        payload: selectAction,
+                        payload: {
+                            actionType: "Select",
+                            props: selectActionProps,
+                        },
                     },
                 };
                 await sendRuntimeMessage(selectmsg);
                 break;
             default:
                 const clickProps = {
-                    "Wait For New Page To load": false,
+                    "Wait For New Page To Load": false,
                     "Wait For File Download": false,
                     Description: getActionDescription(el).trim(),
                 };
-                const clickAction = {
-                    actionType: "Click",
-                    props: { ...commonProps, ...clickProps },
-                };
+                const clickAction = { ...commonProps, ...clickProps };
                 const clickmsg = {
                     status: "new-recorded-action",
                     payload: {
                         type: "RECORDED_ACTION",
-                        actionType: "Click",
-                        payload: clickAction,
+                        payload: {
+                            actionType: "Click",
+                            props: clickAction,
+                        },
                     },
                 };
                 await sendRuntimeMessage(clickmsg);
@@ -293,16 +291,15 @@ class ActionsRecorder {
             Text: typedText,
             "Overwrite Existing Text": false,
         };
-        const typeAction = {
-            actionType: "Type",
-            props: { ...commonProps, ...typeProps },
-        };
+        const typeAction = { ...commonProps, ...typeProps };
         const msg = {
             status: "new-recorded-action",
             payload: {
                 type: "RECORDED_ACTION",
-                actionType: "Type",
-                payload: typeAction,
+                payload: {
+                    actionType: "Type",
+                    props: typeAction,
+                },
             },
         };
         await sendRuntimeMessage(msg);
@@ -563,11 +560,13 @@ function addListItemListeners() {
                     status: "element-action-update",
                     payload: {
                         type: "UPDATE_INTERACTION",
-                        props: {
-                            nodeName: PickList.finalCandidate.nodeName,
-                            selector: new ShortestSelector().getSelector(PickList.finalCandidate, null),
-                        },
-                        actionId: PickList.actionId,
+                        payload: {
+                            actionId: PickList.actionId,
+                            props: {
+                                nodeName: PickList.finalCandidate.nodeName,
+                                selector: new ShortestSelector().getSelector(PickList.finalCandidate, null),
+                            },
+                        }
                     },
                 });
             }
@@ -685,12 +684,14 @@ const PickElement = {
                 status: "element-action-update",
                 payload: {
                     type: "UPDATE_INTERACTION",
-                    props: {
-                        nodeName: PickElement.pickedElement.nodeName,
-                        selector: new ShortestSelector().getSelector(PickElement.pickedElement, null),
-                        ...current_props,
+                    payload: {
+                        props: {
+                            nodeName: PickElement.pickedElement.nodeName,
+                            selector: new ShortestSelector().getSelector(PickElement.pickedElement, null),
+                            ...current_props,
+                        },
+                        actionId: PickElement.actionId,
                     },
-                    actionId: PickElement.actionId,
                 },
             });
             PickElement.mode = undefined;
@@ -823,8 +824,7 @@ const chromeListener = async function (request, _sender, _sendResponse) {
         case "compose-completed":
             console.log("compose-completed chrome runtime called on firstContent script");
             localStorage.setItem("isComposeCompleted", "true");
-            if ("nestingLevel" in request.payload)
-                localStorage.setItem("composeData", JSON.stringify(request.payload));
+            localStorage.setItem("composeData", JSON.stringify(request.payload));
             break;
         case "element-pick":
             if (typeof request.payload !== "object" ||

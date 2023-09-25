@@ -43,8 +43,8 @@ const chromeListener = async function (
       //  Save "composeData" payload send from the EXTENSION's FRONTEND to localstorage so that when as user is composing workflow,
       // it checks both in the extension itself or the current active tab (a user can have either as active so we have to check both places) to find
       // if the compose has completed and get the 'composeData' from either places.
-      if ("nestingLevel" in request.payload)
-        localStorage.setItem("composeData", JSON.stringify(request.payload));
+      // if ("nestingLevel" in request.payload)
+      localStorage.setItem("composeData", JSON.stringify(request.payload));
       break;
 
     case "element-pick":

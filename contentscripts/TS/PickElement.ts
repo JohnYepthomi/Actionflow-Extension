@@ -113,15 +113,17 @@ const PickElement: TPickElement = {
         status: "element-action-update",
         payload: {
           type: "UPDATE_INTERACTION",
-          props: {
-            nodeName: PickElement.pickedElement.nodeName,
-            selector: new ShortestSelector().getSelector(
-              PickElement.pickedElement as HTMLElement,
-              null
-            ),
-            ...current_props,
+          payload: {
+            props: {
+              nodeName: PickElement.pickedElement.nodeName,
+              selector: new ShortestSelector().getSelector(
+                PickElement.pickedElement as HTMLElement,
+                null
+              ),
+              ...current_props,
+            },
+            actionId: PickElement.actionId,
           },
-          actionId: PickElement.actionId,
         },
       });
 

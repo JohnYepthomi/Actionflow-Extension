@@ -235,11 +235,13 @@ const TabActions = {
           status: "new-recorded-action",
           payload: {
             type: "RECORDED_ACTION",
-            actionType: tabAction,
             payload: {
-              url: tabInfo.url,
-              tabId: tabInfo.id,
-              windowId: tabInfo.windowId,
+              actionType: tabAction,
+              props: {
+                url: tabInfo.url,
+                tabId: tabInfo.id,
+                windowId: tabInfo.windowId,
+              },
             },
           },
         },
