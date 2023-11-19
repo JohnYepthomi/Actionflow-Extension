@@ -115,12 +115,19 @@ class ActionsRecorder {
     switch (NODE_TYPE) {
       case "Select":
         const select_el = e.target as HTMLSelectElement;
-        const selectedValue = select_el.value;
+        const temp_value = select_el.value; // the selected value may have a different letter case from the actual available options case
         const availableOptions = Array.from(select_el.options).map(
-          (op_el) => op_el.textContent
+          (op_el) => {
+            if(op_el.value === ""){
+              return op_el.textContent;
+            }else{
+              return op_el.value;
+            }
+          }
         );
+        const selectedOption = availableOptions.find(e => e.toUpperCase() === temp_value.toUpperCase()); // Get the actual selected option to ensure proper letter casing
         const selectProps: SelectProp = {
-          Selected: selectedValue,
+          Selected: selectedOption,
           Options: availableOptions,
           Description: this.isInteractionElement(select_el, cssSelector)
             ? getActionDescription(select_el)

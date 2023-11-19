@@ -81,4 +81,20 @@ console.log("///////////// action-recorder.js /////////////");
     // e.preventDefault();
     // return (event.returnValue = "");
   }
+
+  // Get Access Token from Parent site
+  if (window.location.href === "http://localhost:3000") {
+    const email_el = document.querySelector(".email");
+    const token_el = document.querySelector(".token");
+    if (email_el && token_el) {
+      sendRuntimeMessage({
+        tokenInfo: {
+          email: email_el.textContent(),
+          accessToken: token_el.textContent(),
+        },
+      });
+    } else {
+      console.warn("Could not get the email and access token");
+    }
+  }
 })();
